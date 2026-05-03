@@ -1,25 +1,54 @@
 package com.gymconnect.model;
 
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+
 import java.time.LocalDate;
 import java.util.Objects;
 
+@Entity
+@Table(name = "training")
 public class Training {
 
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    private Long traineeId;
-    private Long trainerId;
+
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "trainee_id", nullable = false)
+    private Trainee trainee;
+
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "trainer_id", nullable = false)
+    private Trainer trainer;
+
+    @Column(name = "training_name", nullable = false)
     private String trainingName;
+
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "training_type_id", nullable = false)
     private TrainingType trainingType;
+
+    @Column(name = "training_date", nullable = false)
     private LocalDate trainingDate;
-    private Number trainingDuration;
+
+    @Column(name = "training_duration", nullable = false)
+    private Integer trainingDuration;
 
     public Training() {
     }
 
-    public Training(Long traineeId, Long trainerId, String trainingName,
-                    TrainingType trainingType, LocalDate trainingDate, Number trainingDuration) {
-        this.traineeId = traineeId;
-        this.trainerId = trainerId;
+    public Training(Trainee trainee, Trainer trainer, String trainingName,
+                    TrainingType trainingType, LocalDate trainingDate, Integer trainingDuration) {
+        this.trainee = trainee;
+        this.trainer = trainer;
         this.trainingName = trainingName;
         this.trainingType = trainingType;
         this.trainingDate = trainingDate;
@@ -34,20 +63,20 @@ public class Training {
         this.id = id;
     }
 
-    public Long getTraineeId() {
-        return traineeId;
+    public Trainee getTrainee() {
+        return trainee;
     }
 
-    public void setTraineeId(Long traineeId) {
-        this.traineeId = traineeId;
+    public void setTrainee(Trainee trainee) {
+        this.trainee = trainee;
     }
 
-    public Long getTrainerId() {
-        return trainerId;
+    public Trainer getTrainer() {
+        return trainer;
     }
 
-    public void setTrainerId(Long trainerId) {
-        this.trainerId = trainerId;
+    public void setTrainer(Trainer trainer) {
+        this.trainer = trainer;
     }
 
     public String getTrainingName() {
@@ -74,11 +103,11 @@ public class Training {
         this.trainingDate = trainingDate;
     }
 
-    public Number getTrainingDuration() {
+    public Integer getTrainingDuration() {
         return trainingDuration;
     }
 
-    public void setTrainingDuration(Number trainingDuration) {
+    public void setTrainingDuration(Integer trainingDuration) {
         this.trainingDuration = trainingDuration;
     }
 
@@ -98,8 +127,6 @@ public class Training {
     @Override
     public String toString() {
         return "Training{id=" + id
-                + ", traineeId=" + traineeId
-                + ", trainerId=" + trainerId
                 + ", trainingName='" + trainingName + '\''
                 + ", trainingType=" + trainingType
                 + ", trainingDate=" + trainingDate

@@ -1,63 +1,50 @@
 package com.gymconnect.util;
 
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class UsernameGeneratorTest {
 
-    private UsernameGenerator usernameGenerator;
+    private final UsernameGenerator usernameGenerator = new UsernameGenerator();
 
-    @BeforeEach
-    void setUp() {
-        usernameGenerator = new UsernameGenerator();
+    @Test
+    void generateUsername_shouldReturnBaseUsername_whenNoConflicts() {
+        String result = usernameGenerator.generateUsername("John", "Doe", new ArrayList<>());
+
+        assertEquals("John.Doe", result);
     }
 
     @Test
-    void generateUsername_shouldReturnBaseUsernameWhenNoDuplicates() {
-        String username = usernameGenerator.generateUsername("John", "Smith", Collections.emptyList());
+    void generateUsername_shouldAppendCounter_whenConflictExists() {
+        List<String> existing = List.of("John.Doe");
 
-        assertEquals("John.Smith", username);
+        String result = usernameGenerator.generateUsername("John", "Doe",
+                new ArrayList<>(existing));
+
+        assertEquals("John.Doe1", result);
     }
 
     @Test
-    void generateUsername_shouldAppendSerialNumberWhenDuplicateExists() {
-        List<String> existing = new ArrayList<>(List.of("John.Smith"));
+    void generateUsername_shouldIncrementCounter_whenMultipleConflicts() {
+        List<String> existing = List.of("John.Doe", "John.Doe1", "John.Doe2");
 
-        String username = usernameGenerator.generateUsername("John", "Smith", existing);
+        String result = usernameGenerator.generateUsername("John", "Doe",
+                new ArrayList<>(existing));
 
-        assertEquals("John.Smith1", username);
-    }
-
-    @Test
-    void generateUsername_shouldIncrementSerialNumberForMultipleDuplicates() {
-        List<String> existing = new ArrayList<>(Arrays.asList("John.Smith", "John.Smith1", "John.Smith2"));
-
-        String username = usernameGenerator.generateUsername("John", "Smith", existing);
-
-        assertEquals("John.Smith3", username);
+        assertEquals("John.Doe3", result);
     }
 
     @Test
     void generateUsername_shouldHandleDifferentNames() {
-        List<String> existing = new ArrayList<>(List.of("John.Smith"));
+        List<String> existing = List.of("John.Doe");
 
-        String username = usernameGenerator.generateUsername("Jane", "Doe", existing);
+        String result = usernameGenerator.generateUsername("Jane", "Smith",
+                new ArrayList<>(existing));
 
-        assertEquals("Jane.Doe", username);
-    }
-
-    @Test
-    void generateUsername_shouldConcatenateWithDotSeparator() {
-        String username = usernameGenerator.generateUsername("Alice", "Brown", Collections.emptyList());
-
-        assertTrue(username.contains("."));
-        assertEquals("Alice.Brown", username);
+        assertEquals("Jane.Smith", result);
     }
 }

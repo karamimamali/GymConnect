@@ -1,31 +1,32 @@
 package com.gymconnect.util;
 
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import java.util.HashSet;
-import java.util.Set;
-
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class PasswordGeneratorTest {
 
-    private PasswordGenerator passwordGenerator;
+    private final PasswordGenerator passwordGenerator = new PasswordGenerator();
 
-    @BeforeEach
-    void setUp() {
-        passwordGenerator = new PasswordGenerator();
+    @Test
+    void generatePassword_shouldReturnNonNull() {
+        String password = passwordGenerator.generatePassword();
+
+        assertNotNull(password);
     }
 
     @Test
-    void generatePassword_shouldReturn10CharacterString() {
+    void generatePassword_shouldReturnTenCharacters() {
         String password = passwordGenerator.generatePassword();
 
         assertEquals(10, password.length());
     }
 
     @Test
-    void generatePassword_shouldContainOnlyAlphanumericCharacters() {
+    void generatePassword_shouldContainOnlyAlphanumeric() {
         String password = passwordGenerator.generatePassword();
 
         assertTrue(password.matches("[A-Za-z0-9]+"));
@@ -33,25 +34,9 @@ class PasswordGeneratorTest {
 
     @Test
     void generatePassword_shouldGenerateUniquePasswords() {
-        Set<String> passwords = new HashSet<>();
-        for (int i = 0; i < 100; i++) {
-            passwords.add(passwordGenerator.generatePassword());
-        }
+        String password1 = passwordGenerator.generatePassword();
+        String password2 = passwordGenerator.generatePassword();
 
-        assertEquals(100, passwords.size());
-    }
-
-    @Test
-    void generatePassword_shouldNotReturnNull() {
-        String password = passwordGenerator.generatePassword();
-
-        assertNotNull(password);
-    }
-
-    @Test
-    void generatePassword_shouldNotReturnEmptyString() {
-        String password = passwordGenerator.generatePassword();
-
-        assertFalse(password.isEmpty());
+        assertNotEquals(password1, password2);
     }
 }

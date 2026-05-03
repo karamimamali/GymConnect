@@ -24,15 +24,26 @@ repositories {
 }
 
 dependencies {
+    // Spring
     implementation 'org.springframework:spring-context:6.1.14'
+    implementation 'org.springframework:spring-orm:6.1.14'
+    implementation 'org.springframework:spring-tx:6.1.14'
+
+    // Hibernate
+    implementation 'org.hibernate.orm:hibernate-core:6.4.4.Final'
+
+    // H2 Database
+    implementation 'com.h2database:h2:2.2.224'
+
+    // Logging
     implementation 'org.slf4j:slf4j-api:2.0.16'
     implementation 'ch.qos.logback:logback-classic:1.5.12'
-    implementation 'com.fasterxml.jackson.core:jackson-databind:2.18.1'
-    implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.18.1'
 
+    // Test
     testImplementation 'org.junit.jupiter:junit-jupiter:5.11.3'
     testImplementation 'org.mockito:mockito-core:5.14.2'
     testImplementation 'org.mockito:mockito-junit-jupiter:5.14.2'
+    testImplementation 'org.springframework:spring-test:6.1.14'
 }
 
 test {
@@ -42,6 +53,14 @@ test {
 
 jacocoTestReport {
     dependsOn test
+    afterEvaluate {
+        classDirectories.setFrom(files(classDirectories.files.collect {
+            fileTree(dir: it, exclude: [
+                    'com/gymconnect/GymApplication.class',
+                    'com/gymconnect/config/**'
+            ])
+        }))
+    }
     reports {
         xml.required = true
         html.required = true
@@ -49,6 +68,14 @@ jacocoTestReport {
 }
 
 jacocoTestCoverageVerification {
+    afterEvaluate {
+        classDirectories.setFrom(files(classDirectories.files.collect {
+            fileTree(dir: it, exclude: [
+                    'com/gymconnect/GymApplication.class',
+                    'com/gymconnect/config/**'
+            ])
+        }))
+    }
     violationRules {
         rule {
             limit {

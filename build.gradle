@@ -2,6 +2,8 @@ plugins {
     id 'java'
     id 'jacoco'
     id 'application'
+    id 'org.springframework.boot' version '3.3.5'
+    id 'io.spring.dependency-management' version '1.1.6'
 }
 
 group = 'com.gymconnect'
@@ -24,26 +26,25 @@ repositories {
 }
 
 dependencies {
-    // Spring
-    implementation 'org.springframework:spring-context:6.1.14'
-    implementation 'org.springframework:spring-orm:6.1.14'
-    implementation 'org.springframework:spring-tx:6.1.14'
+    // Spring Boot
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
 
-    // Hibernate
+    // Spring ORM + Hibernate
+    implementation 'org.springframework:spring-orm:6.1.14'
     implementation 'org.hibernate.orm:hibernate-core:6.4.4.Final'
 
     // H2 Database
     implementation 'com.h2database:h2:2.2.224'
 
-    // Logging
-    implementation 'org.slf4j:slf4j-api:2.0.16'
-    implementation 'ch.qos.logback:logback-classic:1.5.12'
+    // Swagger / OpenAPI
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.6.0'
 
     // Test
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.junit.jupiter:junit-jupiter:5.11.3'
     testImplementation 'org.mockito:mockito-core:5.14.2'
     testImplementation 'org.mockito:mockito-junit-jupiter:5.14.2'
-    testImplementation 'org.springframework:spring-test:6.1.14'
 }
 
 test {
@@ -57,7 +58,8 @@ jacocoTestReport {
         classDirectories.setFrom(files(classDirectories.files.collect {
             fileTree(dir: it, exclude: [
                     'com/gymconnect/GymApplication.class',
-                    'com/gymconnect/config/**'
+                    'com/gymconnect/config/**',
+                    'com/gymconnect/dto/**'
             ])
         }))
     }
@@ -72,7 +74,8 @@ jacocoTestCoverageVerification {
         classDirectories.setFrom(files(classDirectories.files.collect {
             fileTree(dir: it, exclude: [
                     'com/gymconnect/GymApplication.class',
-                    'com/gymconnect/config/**'
+                    'com/gymconnect/config/**',
+                    'com/gymconnect/dto/**'
             ])
         }))
     }

@@ -170,6 +170,19 @@ public class GymFacade {
                 trainingName, trainingTypeName, trainingDate, trainingDuration);
     }
 
+    public Training addTraining(String traineeUsername, String traineePassword,
+                                 String trainerUsername, String trainingName,
+                                 LocalDate trainingDate, Integer trainingDuration) {
+        logger.info("Facade: adding training (derive type from trainer)");
+        authenticateTraineeOrFail(traineeUsername, traineePassword);
+        Trainer trainer = trainerService.getTrainerByUsername(trainerUsername)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Trainer not found: " + trainerUsername));
+        String trainingTypeName = trainer.getSpecialization().getTrainingTypeName();
+        return trainingService.addTraining(traineeUsername, trainerUsername,
+                trainingName, trainingTypeName, trainingDate, trainingDuration);
+    }
+
     // 17. Get trainers not assigned to trainee (auth required)
     public List<Trainer> getUnassignedTrainers(String username, String password) {
         logger.debug("Facade: getting unassigned trainers");

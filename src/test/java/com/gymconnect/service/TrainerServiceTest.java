@@ -4,6 +4,7 @@ import com.gymconnect.dao.TrainerDao;
 import com.gymconnect.dao.TrainingDao;
 import com.gymconnect.dao.TrainingTypeDao;
 import com.gymconnect.dao.UserDao;
+import com.gymconnect.metrics.GymMetrics;
 import com.gymconnect.model.Trainer;
 import com.gymconnect.model.Training;
 import com.gymconnect.model.TrainingType;
@@ -51,6 +52,9 @@ class TrainerServiceTest {
 
     @Mock
     private PasswordGenerator passwordGenerator;
+
+    @Mock
+    private GymMetrics gymMetrics;
 
     @InjectMocks
     private TrainerService trainerService;

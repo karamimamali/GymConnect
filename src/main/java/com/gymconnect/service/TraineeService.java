@@ -4,6 +4,7 @@ import com.gymconnect.dao.TraineeDao;
 import com.gymconnect.dao.TrainerDao;
 import com.gymconnect.dao.TrainingDao;
 import com.gymconnect.dao.UserDao;
+import com.gymconnect.metrics.GymMetrics;
 import com.gymconnect.model.Trainee;
 import com.gymconnect.model.Trainer;
 import com.gymconnect.model.Training;
@@ -32,6 +33,7 @@ public class TraineeService {
     private UserDao userDao;
     private UsernameGenerator usernameGenerator;
     private PasswordGenerator passwordGenerator;
+    private GymMetrics gymMetrics;
 
     @Transactional
     public Trainee createTrainee(String firstName, String lastName,
@@ -50,6 +52,7 @@ public class TraineeService {
 
         Trainee trainee = new Trainee(user, dateOfBirth, address);
         Trainee saved = traineeDao.save(trainee);
+        gymMetrics.recordTraineeRegistration();
         logger.info("Trainee profile created with username: {}", username);
         return saved;
     }
@@ -60,7 +63,10 @@ public class TraineeService {
         Optional<Trainee> trainee = traineeDao.findByUsername(username);
         boolean authenticated = trainee.isPresent()
                 && trainee.get().getUser().getPassword().equals(password);
-        if (!authenticated) {
+        if (authenticated) {
+            gymMetrics.recordAuthenticationSuccess();
+        } else {
+            gymMetrics.recordAuthenticationFailure();
             logger.warn("Authentication failed for trainee: {}", username);
         }
         return authenticated;
@@ -133,6 +139,7 @@ public class TraineeService {
     public void deleteTraineeByUsername(String username) {
         logger.info("Deleting trainee profile: {}", username);
         traineeDao.deleteByUsername(username);
+        gymMetrics.recordTraineeDeletion();
         logger.info("Trainee profile deleted: {}", username);
     }
 
@@ -204,5 +211,10 @@ public class TraineeService {
     @Autowired
     public void setPasswordGenerator(PasswordGenerator passwordGenerator) {
         this.passwordGenerator = passwordGenerator;
+    }
+
+    @Autowired
+    public void setGymMetrics(GymMetrics gymMetrics) {
+        this.gymMetrics = gymMetrics;
     }
 }

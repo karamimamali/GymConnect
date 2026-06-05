@@ -4,6 +4,7 @@ import com.gymconnect.dao.TrainerDao;
 import com.gymconnect.dao.TrainingDao;
 import com.gymconnect.dao.TrainingTypeDao;
 import com.gymconnect.dao.UserDao;
+import com.gymconnect.metrics.GymMetrics;
 import com.gymconnect.model.Trainer;
 import com.gymconnect.model.Training;
 import com.gymconnect.model.TrainingType;
@@ -31,6 +32,7 @@ public class TrainerService {
     private UserDao userDao;
     private UsernameGenerator usernameGenerator;
     private PasswordGenerator passwordGenerator;
+    private GymMetrics gymMetrics;
 
     @Transactional
     public Trainer createTrainer(String firstName, String lastName,
@@ -54,6 +56,7 @@ public class TrainerService {
 
         Trainer trainer = new Trainer(user, specialization);
         Trainer saved = trainerDao.save(trainer);
+        gymMetrics.recordTrainerRegistration();
         logger.info("Trainer profile created with username: {}", username);
         return saved;
     }
@@ -64,7 +67,10 @@ public class TrainerService {
         Optional<Trainer> trainer = trainerDao.findByUsername(username);
         boolean authenticated = trainer.isPresent()
                 && trainer.get().getUser().getPassword().equals(password);
-        if (!authenticated) {
+        if (authenticated) {
+            gymMetrics.recordAuthenticationSuccess();
+        } else {
+            gymMetrics.recordAuthenticationFailure();
             logger.warn("Authentication failed for trainer: {}", username);
         }
         return authenticated;
@@ -178,5 +184,10 @@ public class TrainerService {
     @Autowired
     public void setPasswordGenerator(PasswordGenerator passwordGenerator) {
         this.passwordGenerator = passwordGenerator;
+    }
+
+    @Autowired
+    public void setGymMetrics(GymMetrics gymMetrics) {
+        this.gymMetrics = gymMetrics;
     }
 }

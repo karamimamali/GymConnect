@@ -29,152 +29,130 @@ public class GymFacade {
         this.trainingService = trainingService;
     }
 
-    // 1. Create Trainee profile (no auth required)
+    // 1. Create Trainee profile (public - no auth required)
     public Trainee createTrainee(String firstName, String lastName,
                                   LocalDate dateOfBirth, String address) {
         logger.info("Facade: creating trainee profile");
         return traineeService.createTrainee(firstName, lastName, dateOfBirth, address);
     }
 
-    // 2. Create Trainer profile (no auth required)
+    // 2. Create Trainer profile (public - no auth required)
     public Trainer createTrainer(String firstName, String lastName,
                                   String specializationName) {
         logger.info("Facade: creating trainer profile");
         return trainerService.createTrainer(firstName, lastName, specializationName);
     }
 
-    // 3. Trainee username and password matching
+    // 3. Trainee username/password matching (used for login and change-password)
     public boolean authenticateTrainee(String username, String password) {
         logger.debug("Facade: authenticating trainee");
         return traineeService.authenticate(username, password);
     }
 
-    // 4. Trainer username and password matching
+    // 4. Trainer username/password matching (used for login and change-password)
     public boolean authenticateTrainer(String username, String password) {
         logger.debug("Facade: authenticating trainer");
         return trainerService.authenticate(username, password);
     }
 
-    // 5. Select Trainer profile by username (auth required)
-    public Trainer getTrainerByUsername(String username, String password) {
+    // 5. Change password - verifies old password, then stores new BCrypt hash
+    public void changePassword(String username, String oldPassword, String newPassword) {
+        logger.info("Facade: changing password for user: {}", username);
+        boolean isTrainee = traineeService.authenticate(username, oldPassword);
+        if (isTrainee) {
+            traineeService.changePassword(username, newPassword);
+            return;
+        }
+        boolean isTrainer = trainerService.authenticate(username, oldPassword);
+        if (isTrainer) {
+            trainerService.changePassword(username, newPassword);
+            return;
+        }
+        logger.warn("Facade: change-password failed - invalid old password for user: {}", username);
+        throw new SecurityException("Invalid old password");
+    }
+
+    // 6. Select Trainer profile by username (JWT auth enforced by Spring Security)
+    public Trainer getTrainerByUsername(String username) {
         logger.debug("Facade: selecting trainer profile by username");
-        authenticateTrainerOrFail(username, password);
         return trainerService.getTrainerByUsername(username)
                 .orElseThrow(() -> new IllegalArgumentException("Trainer not found: " + username));
     }
 
-    // 6. Select Trainee profile by username (auth required)
-    public Trainee getTraineeByUsername(String username, String password) {
+    // 7. Select Trainee profile by username (JWT auth enforced by Spring Security)
+    public Trainee getTraineeByUsername(String username) {
         logger.debug("Facade: selecting trainee profile by username");
-        authenticateTraineeOrFail(username, password);
         return traineeService.getTraineeByUsername(username)
                 .orElseThrow(() -> new IllegalArgumentException("Trainee not found: " + username));
     }
 
-    // 7. Trainee password change (auth required)
-    public void changeTraineePassword(String username, String oldPassword,
-                                       String newPassword) {
-        logger.info("Facade: changing trainee password");
-        authenticateTraineeOrFail(username, oldPassword);
-        traineeService.changePassword(username, newPassword);
-    }
-
-    // 8. Trainer password change (auth required)
-    public void changeTrainerPassword(String username, String oldPassword,
-                                       String newPassword) {
-        logger.info("Facade: changing trainer password");
-        authenticateTrainerOrFail(username, oldPassword);
-        trainerService.changePassword(username, newPassword);
-    }
-
-    // 9. Update trainer profile (auth required)
-    public Trainer updateTrainer(String username, String password, String firstName,
-                                  String lastName, String specializationName,
-                                  Boolean isActive) {
+    // 8. Update trainer profile (JWT auth enforced by Spring Security)
+    public Trainer updateTrainer(String username, String firstName, String lastName,
+                                  String specializationName, Boolean isActive) {
         logger.info("Facade: updating trainer profile");
-        authenticateTrainerOrFail(username, password);
         return trainerService.updateTrainer(username, firstName, lastName,
                 specializationName, isActive);
     }
 
-    // 10. Update trainee profile (auth required)
-    public Trainee updateTrainee(String username, String password, String firstName,
-                                  String lastName, LocalDate dateOfBirth, String address,
-                                  Boolean isActive) {
+    // 9. Update trainee profile (JWT auth enforced by Spring Security)
+    public Trainee updateTrainee(String username, String firstName, String lastName,
+                                  LocalDate dateOfBirth, String address, Boolean isActive) {
         logger.info("Facade: updating trainee profile");
-        authenticateTraineeOrFail(username, password);
         return traineeService.updateTrainee(username, firstName, lastName,
                 dateOfBirth, address, isActive);
     }
 
-    // 11. Activate/De-activate trainee (auth required)
-    public void activateTrainee(String username, String password) {
+    // 10. Activate trainee (JWT auth enforced by Spring Security)
+    public void activateTrainee(String username) {
         logger.info("Facade: activating trainee");
-        authenticateTraineeOrFail(username, password);
         traineeService.activateTrainee(username);
     }
 
-    public void deactivateTrainee(String username, String password) {
+    // 11. Deactivate trainee (JWT auth enforced by Spring Security)
+    public void deactivateTrainee(String username) {
         logger.info("Facade: deactivating trainee");
-        authenticateTraineeOrFail(username, password);
         traineeService.deactivateTrainee(username);
     }
 
-    // 12. Activate/De-activate trainer (auth required)
-    public void activateTrainer(String username, String password) {
+    // 12. Activate trainer (JWT auth enforced by Spring Security)
+    public void activateTrainer(String username) {
         logger.info("Facade: activating trainer");
-        authenticateTrainerOrFail(username, password);
         trainerService.activateTrainer(username);
     }
 
-    public void deactivateTrainer(String username, String password) {
+    // 13. Deactivate trainer (JWT auth enforced by Spring Security)
+    public void deactivateTrainer(String username) {
         logger.info("Facade: deactivating trainer");
-        authenticateTrainerOrFail(username, password);
         trainerService.deactivateTrainer(username);
     }
 
-    // 13. Delete trainee profile by username (auth required)
-    public void deleteTraineeByUsername(String username, String password) {
+    // 14. Delete trainee profile by username (JWT auth enforced by Spring Security)
+    public void deleteTraineeByUsername(String username) {
         logger.info("Facade: deleting trainee profile");
-        authenticateTraineeOrFail(username, password);
         traineeService.deleteTraineeByUsername(username);
     }
 
-    // 14. Get Trainee Trainings List (auth required)
-    public List<Training> getTraineeTrainings(String username, String password,
-                                               LocalDate fromDate, LocalDate toDate,
-                                               String trainerName, String trainingTypeName) {
+    // 15. Get Trainee Trainings List (JWT auth enforced by Spring Security)
+    public List<Training> getTraineeTrainings(String username, LocalDate fromDate,
+                                               LocalDate toDate, String trainerName,
+                                               String trainingTypeName) {
         logger.debug("Facade: getting trainee trainings");
-        authenticateTraineeOrFail(username, password);
         return traineeService.getTraineeTrainings(username, fromDate, toDate,
                 trainerName, trainingTypeName);
     }
 
-    // 15. Get Trainer Trainings List (auth required)
-    public List<Training> getTrainerTrainings(String username, String password,
-                                               LocalDate fromDate, LocalDate toDate,
-                                               String traineeName) {
+    // 16. Get Trainer Trainings List (JWT auth enforced by Spring Security)
+    public List<Training> getTrainerTrainings(String username, LocalDate fromDate,
+                                               LocalDate toDate, String traineeName) {
         logger.debug("Facade: getting trainer trainings");
-        authenticateTrainerOrFail(username, password);
         return trainerService.getTrainerTrainings(username, fromDate, toDate, traineeName);
     }
 
-    // 16. Add training (auth required — trainee authenticates)
-    public Training addTraining(String traineeUsername, String traineePassword,
-                                 String trainerUsername, String trainingName,
-                                 String trainingTypeName, LocalDate trainingDate,
+    // 17. Add training (JWT auth enforced by Spring Security)
+    public Training addTraining(String traineeUsername, String trainerUsername,
+                                 String trainingName, LocalDate trainingDate,
                                  Integer trainingDuration) {
         logger.info("Facade: adding training");
-        authenticateTraineeOrFail(traineeUsername, traineePassword);
-        return trainingService.addTraining(traineeUsername, trainerUsername,
-                trainingName, trainingTypeName, trainingDate, trainingDuration);
-    }
-
-    public Training addTraining(String traineeUsername, String traineePassword,
-                                 String trainerUsername, String trainingName,
-                                 LocalDate trainingDate, Integer trainingDuration) {
-        logger.info("Facade: adding training (derive type from trainer)");
-        authenticateTraineeOrFail(traineeUsername, traineePassword);
         Trainer trainer = trainerService.getTrainerByUsername(trainerUsername)
                 .orElseThrow(() -> new IllegalArgumentException(
                         "Trainer not found: " + trainerUsername));
@@ -183,32 +161,15 @@ public class GymFacade {
                 trainingName, trainingTypeName, trainingDate, trainingDuration);
     }
 
-    // 17. Get trainers not assigned to trainee (auth required)
-    public List<Trainer> getUnassignedTrainers(String username, String password) {
+    // 18. Get trainers not assigned to trainee (JWT auth enforced by Spring Security)
+    public List<Trainer> getUnassignedTrainers(String username) {
         logger.debug("Facade: getting unassigned trainers");
-        authenticateTraineeOrFail(username, password);
         return traineeService.getUnassignedTrainers(username);
     }
 
-    // 18. Update Trainee's trainers list (auth required)
-    public void updateTraineeTrainers(String username, String password,
-                                       List<String> trainerUsernames) {
+    // 19. Update Trainee's trainers list (JWT auth enforced by Spring Security)
+    public void updateTraineeTrainers(String username, List<String> trainerUsernames) {
         logger.info("Facade: updating trainee's trainers list");
-        authenticateTraineeOrFail(username, password);
         traineeService.updateTraineeTrainers(username, trainerUsernames);
-    }
-
-    private void authenticateTraineeOrFail(String username, String password) {
-        if (!traineeService.authenticate(username, password)) {
-            logger.warn("Facade: trainee authentication failed for: {}", username);
-            throw new SecurityException("Invalid trainee credentials");
-        }
-    }
-
-    private void authenticateTrainerOrFail(String username, String password) {
-        if (!trainerService.authenticate(username, password)) {
-            logger.warn("Facade: trainer authentication failed for: {}", username);
-            throw new SecurityException("Invalid trainer credentials");
-        }
     }
 }

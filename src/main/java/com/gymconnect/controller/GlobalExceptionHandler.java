@@ -4,6 +4,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.LockedException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
@@ -22,6 +23,13 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, String>> handleSecurity(SecurityException ex) {
         logger.warn("Authentication failed: {}", ex.getMessage());
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(Map.of("error", ex.getMessage()));
+    }
+
+    @ExceptionHandler(LockedException.class)
+    public ResponseEntity<Map<String, String>> handleLocked(LockedException ex) {
+        logger.warn("Account locked: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.LOCKED)
                 .body(Map.of("error", ex.getMessage()));
     }
 

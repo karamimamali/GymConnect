@@ -13,8 +13,8 @@ import com.gymconnect.model.Trainee;
 import com.gymconnect.model.Trainer;
 import com.gymconnect.model.Training;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
@@ -49,7 +49,7 @@ public class TrainerController {
     }
 
     @PostMapping
-    @Operation(summary = "Register trainer", description = "Create a new trainer profile")
+    @Operation(summary = "Register trainer", description = "Create a new trainer profile (public)")
     @ApiResponse(responseCode = "201", description = "Trainer registered successfully")
     public ResponseEntity<CredentialsResponse> register(
             @Valid @RequestBody TrainerRegistrationRequest request) {
@@ -57,7 +57,7 @@ public class TrainerController {
         Trainer trainer = gymFacade.createTrainer(request.firstName(), request.lastName(),
                 request.specialization());
         CredentialsResponse response = new CredentialsResponse(
-                trainer.getUser().getUsername(), trainer.getUser().getPassword());
+                trainer.getUser().getUsername(), trainer.getUser().getRawPassword());
         logger.info("Trainer registered with username: {}", response.username());
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
@@ -65,12 +65,11 @@ public class TrainerController {
     @GetMapping("/{username}")
     @Operation(summary = "Get trainer profile", description = "Retrieve trainer profile by username")
     @ApiResponse(responseCode = "200", description = "Profile retrieved successfully")
-    @ApiResponse(responseCode = "401", description = "Invalid credentials")
-    public ResponseEntity<TrainerProfileResponse> getProfile(
-            @PathVariable String username,
-            @Parameter(description = "User password for authentication") @RequestParam String password) {
+    @ApiResponse(responseCode = "401", description = "Unauthorized")
+    @SecurityRequirement(name = "bearerAuth")
+    public ResponseEntity<TrainerProfileResponse> getProfile(@PathVariable String username) {
         logger.debug("Getting trainer profile: {}", username);
-        Trainer trainer = gymFacade.getTrainerByUsername(username, password);
+        Trainer trainer = gymFacade.getTrainerByUsername(username);
         return ResponseEntity.ok(toProfileResponse(trainer));
     }
 
@@ -78,14 +77,14 @@ public class TrainerController {
     @Operation(summary = "Update trainer profile",
             description = "Update an existing trainer profile (specialization is read-only)")
     @ApiResponse(responseCode = "200", description = "Profile updated successfully")
-    @ApiResponse(responseCode = "401", description = "Invalid credentials")
+    @ApiResponse(responseCode = "401", description = "Unauthorized")
+    @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<UpdateTrainerResponse> updateProfile(
-            @Parameter(description = "User password for authentication") @RequestParam String password,
             @Valid @RequestBody UpdateTrainerRequest request) {
         logger.info("Updating trainer profile: {}", request.username());
-        Trainer existing = gymFacade.getTrainerByUsername(request.username(), password);
+        Trainer existing = gymFacade.getTrainerByUsername(request.username());
         String specialization = existing.getSpecialization().getTrainingTypeName();
-        Trainer trainer = gymFacade.updateTrainer(request.username(), password,
+        Trainer trainer = gymFacade.updateTrainer(request.username(),
                 request.firstName(), request.lastName(), specialization, request.isActive());
         return ResponseEntity.ok(toUpdateResponse(trainer));
     }
@@ -94,14 +93,14 @@ public class TrainerController {
     @Operation(summary = "Get trainer trainings list",
             description = "Retrieve trainer's training sessions with optional filters")
     @ApiResponse(responseCode = "200", description = "Trainings list retrieved")
+    @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<List<TrainerTrainingResponse>> getTrainings(
             @PathVariable String username,
-            @Parameter(description = "User password for authentication") @RequestParam String password,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate periodFrom,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate periodTo,
             @RequestParam(required = false) String traineeName) {
         logger.debug("Getting trainings for trainer: {}", username);
-        List<Training> trainings = gymFacade.getTrainerTrainings(username, password,
+        List<Training> trainings = gymFacade.getTrainerTrainings(username,
                 periodFrom, periodTo, traineeName);
         List<TrainerTrainingResponse> response = trainings.stream()
                 .map(t -> new TrainerTrainingResponse(
@@ -120,15 +119,15 @@ public class TrainerController {
             description = "Toggle trainer active status (non-idempotent)")
     @ApiResponse(responseCode = "200", description = "Status changed successfully")
     @ApiResponse(responseCode = "400", description = "Already in requested state")
+    @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<Void> activateDeactivate(
             @PathVariable String username,
-            @Parameter(description = "User password for authentication") @RequestParam String password,
             @Valid @RequestBody ActivateDeactivateRequest request) {
         logger.info("Activate/deactivate trainer: {}, isActive: {}", username, request.isActive());
         if (request.isActive()) {
-            gymFacade.activateTrainer(username, password);
+            gymFacade.activateTrainer(username);
         } else {
-            gymFacade.deactivateTrainer(username, password);
+            gymFacade.deactivateTrainer(username);
         }
         return ResponseEntity.ok().build();
     }

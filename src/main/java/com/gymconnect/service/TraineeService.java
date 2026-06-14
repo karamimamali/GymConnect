@@ -4,6 +4,7 @@ import com.gymconnect.dao.TraineeDao;
 import com.gymconnect.dao.TrainerDao;
 import com.gymconnect.dao.TrainingDao;
 import com.gymconnect.dao.UserDao;
+import com.gymconnect.metrics.GymMetrics;
 import com.gymconnect.model.Trainee;
 import com.gymconnect.model.Trainer;
 import com.gymconnect.model.Training;
@@ -13,6 +14,7 @@ import com.gymconnect.util.UsernameGenerator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,6 +34,8 @@ public class TraineeService {
     private UserDao userDao;
     private UsernameGenerator usernameGenerator;
     private PasswordGenerator passwordGenerator;
+    private GymMetrics gymMetrics;
+    private PasswordEncoder passwordEncoder;
 
     @Transactional
     public Trainee createTrainee(String firstName, String lastName,
@@ -42,14 +46,16 @@ public class TraineeService {
 
         List<String> existingUsernames = userDao.findAllUsernames();
         String username = usernameGenerator.generateUsername(firstName, lastName, existingUsernames);
-        String password = passwordGenerator.generatePassword();
+        String rawPassword = passwordGenerator.generatePassword();
 
         User user = new User(firstName, lastName, true);
         user.setUsername(username);
-        user.setPassword(password);
+        user.setRawPassword(rawPassword);
+        user.setPassword(passwordEncoder.encode(rawPassword));
 
         Trainee trainee = new Trainee(user, dateOfBirth, address);
         Trainee saved = traineeDao.save(trainee);
+        gymMetrics.recordTraineeRegistration();
         logger.info("Trainee profile created with username: {}", username);
         return saved;
     }
@@ -59,8 +65,11 @@ public class TraineeService {
         logger.debug("Authenticating trainee with username: {}", username);
         Optional<Trainee> trainee = traineeDao.findByUsername(username);
         boolean authenticated = trainee.isPresent()
-                && trainee.get().getUser().getPassword().equals(password);
-        if (!authenticated) {
+                && passwordEncoder.matches(password, trainee.get().getUser().getPassword());
+        if (authenticated) {
+            gymMetrics.recordAuthenticationSuccess();
+        } else {
+            gymMetrics.recordAuthenticationFailure();
             logger.warn("Authentication failed for trainee: {}", username);
         }
         return authenticated;
@@ -78,7 +87,7 @@ public class TraineeService {
         validateRequired(newPassword, "New password");
         Trainee trainee = traineeDao.findByUsername(username)
                 .orElseThrow(() -> new IllegalArgumentException("Trainee not found: " + username));
-        trainee.getUser().setPassword(newPassword);
+        trainee.getUser().setPassword(passwordEncoder.encode(newPassword));
         traineeDao.update(trainee);
         logger.info("Password changed successfully for trainee: {}", username);
     }
@@ -133,6 +142,7 @@ public class TraineeService {
     public void deleteTraineeByUsername(String username) {
         logger.info("Deleting trainee profile: {}", username);
         traineeDao.deleteByUsername(username);
+        gymMetrics.recordTraineeDeletion();
         logger.info("Trainee profile deleted: {}", username);
     }
 
@@ -204,5 +214,15 @@ public class TraineeService {
     @Autowired
     public void setPasswordGenerator(PasswordGenerator passwordGenerator) {
         this.passwordGenerator = passwordGenerator;
+    }
+
+    @Autowired
+    public void setGymMetrics(GymMetrics gymMetrics) {
+        this.gymMetrics = gymMetrics;
+    }
+
+    @Autowired
+    public void setPasswordEncoder(PasswordEncoder passwordEncoder) {
+        this.passwordEncoder = passwordEncoder;
     }
 }

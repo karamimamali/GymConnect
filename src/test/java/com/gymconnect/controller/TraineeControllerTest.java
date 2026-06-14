@@ -62,6 +62,7 @@ class TraineeControllerTest {
         User user = new User(firstName, lastName, true);
         user.setUsername(username);
         user.setPassword(password);
+        user.setRawPassword(password);
         Trainee trainee = new Trainee(user, LocalDate.of(2000, 1, 1), "Address");
         trainee.setTrainers(List.of());
         return trainee;
@@ -111,10 +112,9 @@ class TraineeControllerTest {
         Trainer trainer = createTrainer("Bob", "Davis", "Bob.Davis");
         trainee.setTrainers(List.of(trainer));
 
-        when(gymFacade.getTraineeByUsername("Alice.Brown", "pass")).thenReturn(trainee);
+        when(gymFacade.getTraineeByUsername("Alice.Brown")).thenReturn(trainee);
 
-        mockMvc.perform(get("/api/trainees/Alice.Brown")
-                        .param("password", "pass"))
+        mockMvc.perform(get("/api/trainees/Alice.Brown"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.firstName").value("Alice"))
                 .andExpect(jsonPath("$.lastName").value("Brown"))
@@ -123,13 +123,12 @@ class TraineeControllerTest {
     }
 
     @Test
-    void getProfileWithInvalidPasswordReturns401() throws Exception {
-        when(gymFacade.getTraineeByUsername("Alice.Brown", "wrong"))
-                .thenThrow(new SecurityException("Invalid trainee credentials"));
+    void getProfileNotFoundReturns404() throws Exception {
+        when(gymFacade.getTraineeByUsername("unknown"))
+                .thenThrow(new IllegalArgumentException("Trainee not found: unknown"));
 
-        mockMvc.perform(get("/api/trainees/Alice.Brown")
-                        .param("password", "wrong"))
-                .andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/api/trainees/unknown"))
+                .andExpect(status().isNotFound());
     }
 
     @Test
@@ -137,7 +136,7 @@ class TraineeControllerTest {
         Trainee trainee = createTrainee("Alice", "Smith", "Alice.Brown", "pass");
         trainee.setTrainers(List.of());
 
-        when(gymFacade.updateTrainee("Alice.Brown", "pass", "Alice", "Smith",
+        when(gymFacade.updateTrainee("Alice.Brown", "Alice", "Smith",
                 LocalDate.of(2000, 1, 1), "New Address", true)).thenReturn(trainee);
 
         UpdateTraineeRequest request = new UpdateTraineeRequest(
@@ -145,35 +144,30 @@ class TraineeControllerTest {
                 "New Address", true);
 
         mockMvc.perform(put("/api/trainees")
-                        .param("password", "pass")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.username").value("Alice.Brown"))
-                .andExpect(jsonPath("$.firstName").value("Alice"))
-                .andExpect(jsonPath("$.lastName").value("Smith"));
+                .andExpect(jsonPath("$.firstName").value("Alice"));
     }
 
     @Test
     void deleteProfileReturns200() throws Exception {
-        doNothing().when(gymFacade).deleteTraineeByUsername("Alice.Brown", "pass");
+        doNothing().when(gymFacade).deleteTraineeByUsername("Alice.Brown");
 
-        mockMvc.perform(delete("/api/trainees/Alice.Brown")
-                        .param("password", "pass"))
+        mockMvc.perform(delete("/api/trainees/Alice.Brown"))
                 .andExpect(status().isOk());
 
-        verify(gymFacade).deleteTraineeByUsername("Alice.Brown", "pass");
+        verify(gymFacade).deleteTraineeByUsername("Alice.Brown");
     }
 
     @Test
     void getNotAssignedTrainersReturnsList() throws Exception {
         Trainer trainer = createTrainer("Bob", "Davis", "Bob.Davis");
 
-        when(gymFacade.getUnassignedTrainers("Alice.Brown", "pass"))
-                .thenReturn(List.of(trainer));
+        when(gymFacade.getUnassignedTrainers("Alice.Brown")).thenReturn(List.of(trainer));
 
-        mockMvc.perform(get("/api/trainees/Alice.Brown/not-assigned-trainers")
-                        .param("password", "pass"))
+        mockMvc.perform(get("/api/trainees/Alice.Brown/not-assigned-trainers"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].username").value("Bob.Davis"))
                 .andExpect(jsonPath("$[0].specialization").value("FITNESS"));
@@ -185,15 +179,13 @@ class TraineeControllerTest {
         Trainee trainee = createTrainee("Alice", "Brown", "Alice.Brown", "pass");
         trainee.setTrainers(List.of(trainer));
 
-        doNothing().when(gymFacade)
-                .updateTraineeTrainers("Alice.Brown", "pass", List.of("Bob.Davis"));
-        when(gymFacade.getTraineeByUsername("Alice.Brown", "pass")).thenReturn(trainee);
+        doNothing().when(gymFacade).updateTraineeTrainers("Alice.Brown", List.of("Bob.Davis"));
+        when(gymFacade.getTraineeByUsername("Alice.Brown")).thenReturn(trainee);
 
         UpdateTraineeTrainersRequest request = new UpdateTraineeTrainersRequest(
                 List.of("Bob.Davis"));
 
         mockMvc.perform(put("/api/trainees/Alice.Brown/trainers")
-                        .param("password", "pass")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
@@ -208,11 +200,10 @@ class TraineeControllerTest {
         Training training = new Training(trainee, trainer, "Morning Session",
                 type, LocalDate.of(2026, 6, 1), 60);
 
-        when(gymFacade.getTraineeTrainings("Alice.Brown", "pass", null, null, null, null))
+        when(gymFacade.getTraineeTrainings("Alice.Brown", null, null, null, null))
                 .thenReturn(List.of(training));
 
-        mockMvc.perform(get("/api/trainees/Alice.Brown/trainings")
-                        .param("password", "pass"))
+        mockMvc.perform(get("/api/trainees/Alice.Brown/trainings"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].trainingName").value("Morning Session"))
                 .andExpect(jsonPath("$[0].trainingDuration").value(60))
@@ -222,14 +213,13 @@ class TraineeControllerTest {
     @Test
     void addTrainingReturns200() throws Exception {
         Training training = new Training();
-        when(gymFacade.addTraining(eq("Alice.Brown"), eq("pass"), eq("Bob.Davis"),
+        when(gymFacade.addTraining(eq("Alice.Brown"), eq("Bob.Davis"),
                 eq("Morning"), any(LocalDate.class), eq(60))).thenReturn(training);
 
         AddTrainingRequest request = new AddTrainingRequest(
                 "Alice.Brown", "Bob.Davis", "Morning", LocalDate.of(2026, 6, 1), 60);
 
         mockMvc.perform(post("/api/trainees/Alice.Brown/trainings")
-                        .param("password", "pass")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk());
@@ -237,43 +227,40 @@ class TraineeControllerTest {
 
     @Test
     void activateTraineeReturns200() throws Exception {
-        doNothing().when(gymFacade).activateTrainee("Alice.Brown", "pass");
+        doNothing().when(gymFacade).activateTrainee("Alice.Brown");
 
         ActivateDeactivateRequest request = new ActivateDeactivateRequest(true);
 
         mockMvc.perform(patch("/api/trainees/Alice.Brown")
-                        .param("password", "pass")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk());
 
-        verify(gymFacade).activateTrainee("Alice.Brown", "pass");
+        verify(gymFacade).activateTrainee("Alice.Brown");
     }
 
     @Test
     void deactivateTraineeReturns200() throws Exception {
-        doNothing().when(gymFacade).deactivateTrainee("Alice.Brown", "pass");
+        doNothing().when(gymFacade).deactivateTrainee("Alice.Brown");
 
         ActivateDeactivateRequest request = new ActivateDeactivateRequest(false);
 
         mockMvc.perform(patch("/api/trainees/Alice.Brown")
-                        .param("password", "pass")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk());
 
-        verify(gymFacade).deactivateTrainee("Alice.Brown", "pass");
+        verify(gymFacade).deactivateTrainee("Alice.Brown");
     }
 
     @Test
     void activateAlreadyActiveReturns400() throws Exception {
         doThrow(new IllegalStateException("Trainee is already active: Alice.Brown"))
-                .when(gymFacade).activateTrainee("Alice.Brown", "pass");
+                .when(gymFacade).activateTrainee("Alice.Brown");
 
         ActivateDeactivateRequest request = new ActivateDeactivateRequest(true);
 
         mockMvc.perform(patch("/api/trainees/Alice.Brown")
-                        .param("password", "pass")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest());

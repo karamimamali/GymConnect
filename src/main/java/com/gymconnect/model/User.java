@@ -6,6 +6,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
 
 import java.util.Objects;
 
@@ -31,6 +32,10 @@ public class User {
 
     @Column(name = "is_active", nullable = false)
     private Boolean isActive;
+
+    /** Transient – holds the generated plain-text password after creation only; never persisted. */
+    @Transient
+    private String rawPassword;
 
     public User() {
     }
@@ -87,6 +92,14 @@ public class User {
 
     public void setIsActive(Boolean isActive) {
         this.isActive = isActive;
+    }
+
+    public String getRawPassword() {
+        return rawPassword;
+    }
+
+    public void setRawPassword(String rawPassword) {
+        this.rawPassword = rawPassword;
     }
 
     @Override

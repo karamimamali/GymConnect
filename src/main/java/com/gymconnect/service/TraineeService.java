@@ -14,6 +14,7 @@ import com.gymconnect.util.UsernameGenerator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,6 +35,7 @@ public class TraineeService {
     private UsernameGenerator usernameGenerator;
     private PasswordGenerator passwordGenerator;
     private GymMetrics gymMetrics;
+    private PasswordEncoder passwordEncoder;
 
     @Transactional
     public Trainee createTrainee(String firstName, String lastName,
@@ -44,11 +46,12 @@ public class TraineeService {
 
         List<String> existingUsernames = userDao.findAllUsernames();
         String username = usernameGenerator.generateUsername(firstName, lastName, existingUsernames);
-        String password = passwordGenerator.generatePassword();
+        String rawPassword = passwordGenerator.generatePassword();
 
         User user = new User(firstName, lastName, true);
         user.setUsername(username);
-        user.setPassword(password);
+        user.setRawPassword(rawPassword);
+        user.setPassword(passwordEncoder.encode(rawPassword));
 
         Trainee trainee = new Trainee(user, dateOfBirth, address);
         Trainee saved = traineeDao.save(trainee);
@@ -62,7 +65,7 @@ public class TraineeService {
         logger.debug("Authenticating trainee with username: {}", username);
         Optional<Trainee> trainee = traineeDao.findByUsername(username);
         boolean authenticated = trainee.isPresent()
-                && trainee.get().getUser().getPassword().equals(password);
+                && passwordEncoder.matches(password, trainee.get().getUser().getPassword());
         if (authenticated) {
             gymMetrics.recordAuthenticationSuccess();
         } else {
@@ -84,7 +87,7 @@ public class TraineeService {
         validateRequired(newPassword, "New password");
         Trainee trainee = traineeDao.findByUsername(username)
                 .orElseThrow(() -> new IllegalArgumentException("Trainee not found: " + username));
-        trainee.getUser().setPassword(newPassword);
+        trainee.getUser().setPassword(passwordEncoder.encode(newPassword));
         traineeDao.update(trainee);
         logger.info("Password changed successfully for trainee: {}", username);
     }
@@ -216,5 +219,10 @@ public class TraineeService {
     @Autowired
     public void setGymMetrics(GymMetrics gymMetrics) {
         this.gymMetrics = gymMetrics;
+    }
+
+    @Autowired
+    public void setPasswordEncoder(PasswordEncoder passwordEncoder) {
+        this.passwordEncoder = passwordEncoder;
     }
 }

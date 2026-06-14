@@ -17,6 +17,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -56,6 +57,9 @@ class TrainerServiceTest {
     @Mock
     private GymMetrics gymMetrics;
 
+    @Mock
+    private PasswordEncoder passwordEncoder;
+
     @InjectMocks
     private TrainerService trainerService;
 
@@ -84,6 +88,7 @@ class TrainerServiceTest {
         when(usernameGenerator.generateUsername("Mike", "Johnson", new ArrayList<>()))
                 .thenReturn("Mike.Johnson");
         when(passwordGenerator.generatePassword()).thenReturn("testPass123");
+        when(passwordEncoder.encode("testPass123")).thenReturn("$2a$hash");
         when(trainerDao.save(any(Trainer.class))).thenAnswer(inv -> {
             Trainer t = inv.getArgument(0);
             t.setId(1L);
@@ -94,6 +99,7 @@ class TrainerServiceTest {
 
         assertNotNull(result);
         assertEquals("Mike.Johnson", result.getUser().getUsername());
+        assertEquals("testPass123", result.getUser().getRawPassword());
         verify(trainerDao).save(any(Trainer.class));
     }
 
@@ -126,6 +132,7 @@ class TrainerServiceTest {
     @Test
     void authenticate_shouldReturnTrue_whenCredentialsMatch() {
         when(trainerDao.findByUsername("Mike.Johnson")).thenReturn(Optional.of(trainer));
+        when(passwordEncoder.matches("testPass123", "testPass123")).thenReturn(true);
 
         boolean result = trainerService.authenticate("Mike.Johnson", "testPass123");
 
@@ -135,6 +142,7 @@ class TrainerServiceTest {
     @Test
     void authenticate_shouldReturnFalse_whenPasswordWrong() {
         when(trainerDao.findByUsername("Mike.Johnson")).thenReturn(Optional.of(trainer));
+        when(passwordEncoder.matches("wrongPass", "testPass123")).thenReturn(false);
 
         boolean result = trainerService.authenticate("Mike.Johnson", "wrongPass");
 
@@ -164,10 +172,11 @@ class TrainerServiceTest {
     void changePassword_shouldUpdatePassword() {
         when(trainerDao.findByUsername("Mike.Johnson")).thenReturn(Optional.of(trainer));
         when(trainerDao.update(any(Trainer.class))).thenReturn(trainer);
+        when(passwordEncoder.encode("newPass1234")).thenReturn("$2a$hashednew");
 
         trainerService.changePassword("Mike.Johnson", "newPass1234");
 
-        assertEquals("newPass1234", trainer.getUser().getPassword());
+        assertEquals("$2a$hashednew", trainer.getUser().getPassword());
         verify(trainerDao).update(trainer);
     }
 

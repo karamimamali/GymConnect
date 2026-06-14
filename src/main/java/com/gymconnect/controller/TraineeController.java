@@ -15,8 +15,8 @@ import com.gymconnect.model.Trainee;
 import com.gymconnect.model.Trainer;
 import com.gymconnect.model.Training;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
@@ -52,7 +52,7 @@ public class TraineeController {
     }
 
     @PostMapping
-    @Operation(summary = "Register trainee", description = "Create a new trainee profile")
+    @Operation(summary = "Register trainee", description = "Create a new trainee profile (public)")
     @ApiResponse(responseCode = "201", description = "Trainee registered successfully")
     public ResponseEntity<CredentialsResponse> register(
             @Valid @RequestBody TraineeRegistrationRequest request) {
@@ -60,7 +60,7 @@ public class TraineeController {
         Trainee trainee = gymFacade.createTrainee(request.firstName(), request.lastName(),
                 request.dateOfBirth(), request.address());
         CredentialsResponse response = new CredentialsResponse(
-                trainee.getUser().getUsername(), trainee.getUser().getPassword());
+                trainee.getUser().getUsername(), trainee.getUser().getRawPassword());
         logger.info("Trainee registered with username: {}", response.username());
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
@@ -68,24 +68,23 @@ public class TraineeController {
     @GetMapping("/{username}")
     @Operation(summary = "Get trainee profile", description = "Retrieve trainee profile by username")
     @ApiResponse(responseCode = "200", description = "Profile retrieved successfully")
-    @ApiResponse(responseCode = "401", description = "Invalid credentials")
-    public ResponseEntity<TraineeProfileResponse> getProfile(
-            @PathVariable String username,
-            @Parameter(description = "User password for authentication") @RequestParam String password) {
+    @ApiResponse(responseCode = "401", description = "Unauthorized")
+    @SecurityRequirement(name = "bearerAuth")
+    public ResponseEntity<TraineeProfileResponse> getProfile(@PathVariable String username) {
         logger.debug("Getting trainee profile: {}", username);
-        Trainee trainee = gymFacade.getTraineeByUsername(username, password);
+        Trainee trainee = gymFacade.getTraineeByUsername(username);
         return ResponseEntity.ok(toProfileResponse(trainee));
     }
 
     @PutMapping
     @Operation(summary = "Update trainee profile", description = "Update an existing trainee profile")
     @ApiResponse(responseCode = "200", description = "Profile updated successfully")
-    @ApiResponse(responseCode = "401", description = "Invalid credentials")
+    @ApiResponse(responseCode = "401", description = "Unauthorized")
+    @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<UpdateTraineeResponse> updateProfile(
-            @Parameter(description = "User password for authentication") @RequestParam String password,
             @Valid @RequestBody UpdateTraineeRequest request) {
         logger.info("Updating trainee profile: {}", request.username());
-        Trainee trainee = gymFacade.updateTrainee(request.username(), password,
+        Trainee trainee = gymFacade.updateTrainee(request.username(),
                 request.firstName(), request.lastName(), request.dateOfBirth(),
                 request.address(), request.isActive());
         return ResponseEntity.ok(toUpdateResponse(trainee));
@@ -94,12 +93,11 @@ public class TraineeController {
     @DeleteMapping("/{username}")
     @Operation(summary = "Delete trainee profile", description = "Hard delete trainee profile and cascade trainings")
     @ApiResponse(responseCode = "200", description = "Profile deleted successfully")
-    @ApiResponse(responseCode = "401", description = "Invalid credentials")
-    public ResponseEntity<Void> deleteProfile(
-            @PathVariable String username,
-            @Parameter(description = "User password for authentication") @RequestParam String password) {
+    @ApiResponse(responseCode = "401", description = "Unauthorized")
+    @SecurityRequirement(name = "bearerAuth")
+    public ResponseEntity<Void> deleteProfile(@PathVariable String username) {
         logger.info("Deleting trainee profile: {}", username);
-        gymFacade.deleteTraineeByUsername(username, password);
+        gymFacade.deleteTraineeByUsername(username);
         return ResponseEntity.ok().build();
     }
 
@@ -107,11 +105,11 @@ public class TraineeController {
     @Operation(summary = "Get not assigned active trainers",
             description = "Get active trainers not assigned to the trainee")
     @ApiResponse(responseCode = "200", description = "Trainers list retrieved")
+    @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<List<TrainerSummary>> getNotAssignedTrainers(
-            @PathVariable String username,
-            @Parameter(description = "User password for authentication") @RequestParam String password) {
+            @PathVariable String username) {
         logger.debug("Getting unassigned trainers for trainee: {}", username);
-        List<Trainer> trainers = gymFacade.getUnassignedTrainers(username, password);
+        List<Trainer> trainers = gymFacade.getUnassignedTrainers(username);
         List<TrainerSummary> response = trainers.stream()
                 .map(this::toTrainerSummary)
                 .toList();
@@ -122,13 +120,13 @@ public class TraineeController {
     @Operation(summary = "Update trainee's trainer list",
             description = "Replace the trainee's assigned trainers list")
     @ApiResponse(responseCode = "200", description = "Trainers list updated")
+    @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<List<TrainerSummary>> updateTrainers(
             @PathVariable String username,
-            @Parameter(description = "User password for authentication") @RequestParam String password,
             @Valid @RequestBody UpdateTraineeTrainersRequest request) {
         logger.info("Updating trainers list for trainee: {}", username);
-        gymFacade.updateTraineeTrainers(username, password, request.trainerUsernames());
-        Trainee trainee = gymFacade.getTraineeByUsername(username, password);
+        gymFacade.updateTraineeTrainers(username, request.trainerUsernames());
+        Trainee trainee = gymFacade.getTraineeByUsername(username);
         List<TrainerSummary> response = trainee.getTrainers().stream()
                 .map(this::toTrainerSummary)
                 .toList();
@@ -139,15 +137,15 @@ public class TraineeController {
     @Operation(summary = "Get trainee trainings list",
             description = "Retrieve trainee's training sessions with optional filters")
     @ApiResponse(responseCode = "200", description = "Trainings list retrieved")
+    @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<List<TrainingResponse>> getTrainings(
             @PathVariable String username,
-            @Parameter(description = "User password for authentication") @RequestParam String password,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate periodFrom,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate periodTo,
             @RequestParam(required = false) String trainerName,
             @RequestParam(required = false) String trainingType) {
         logger.debug("Getting trainings for trainee: {}", username);
-        List<Training> trainings = gymFacade.getTraineeTrainings(username, password,
+        List<Training> trainings = gymFacade.getTraineeTrainings(username,
                 periodFrom, periodTo, trainerName, trainingType);
         List<TrainingResponse> response = trainings.stream()
                 .map(t -> new TrainingResponse(
@@ -164,12 +162,12 @@ public class TraineeController {
     @PostMapping("/{username}/trainings")
     @Operation(summary = "Add training", description = "Create a new training session")
     @ApiResponse(responseCode = "200", description = "Training added successfully")
+    @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<Void> addTraining(
             @PathVariable String username,
-            @Parameter(description = "User password for authentication") @RequestParam String password,
             @Valid @RequestBody AddTrainingRequest request) {
         logger.info("Adding training for trainee: {}", username);
-        gymFacade.addTraining(username, password, request.trainerUsername(),
+        gymFacade.addTraining(username, request.trainerUsername(),
                 request.trainingName(), request.trainingDate(),
                 request.trainingDuration());
         return ResponseEntity.ok().build();
@@ -180,15 +178,15 @@ public class TraineeController {
             description = "Toggle trainee active status (non-idempotent)")
     @ApiResponse(responseCode = "200", description = "Status changed successfully")
     @ApiResponse(responseCode = "400", description = "Already in requested state")
+    @SecurityRequirement(name = "bearerAuth")
     public ResponseEntity<Void> activateDeactivate(
             @PathVariable String username,
-            @Parameter(description = "User password for authentication") @RequestParam String password,
             @Valid @RequestBody ActivateDeactivateRequest request) {
         logger.info("Activate/deactivate trainee: {}, isActive: {}", username, request.isActive());
         if (request.isActive()) {
-            gymFacade.activateTrainee(username, password);
+            gymFacade.activateTrainee(username);
         } else {
-            gymFacade.deactivateTrainee(username, password);
+            gymFacade.deactivateTrainee(username);
         }
         return ResponseEntity.ok().build();
     }

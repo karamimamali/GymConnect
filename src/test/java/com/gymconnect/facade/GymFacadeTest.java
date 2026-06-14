@@ -23,7 +23,6 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -32,10 +31,8 @@ class GymFacadeTest {
 
     @Mock
     private TraineeService traineeService;
-
     @Mock
     private TrainerService trainerService;
-
     @Mock
     private TrainingService trainingService;
 
@@ -115,225 +112,182 @@ class GymFacadeTest {
     }
 
     @Test
-    void getTraineeByUsername_shouldReturnTrainee_whenAuthenticated() {
-        when(traineeService.authenticate(TRAINEE_USERNAME, PASSWORD)).thenReturn(true);
+    void getTraineeByUsername_shouldReturnTrainee() {
         when(traineeService.getTraineeByUsername(TRAINEE_USERNAME))
                 .thenReturn(Optional.of(trainee));
 
-        Trainee result = gymFacade.getTraineeByUsername(TRAINEE_USERNAME, PASSWORD);
+        Trainee result = gymFacade.getTraineeByUsername(TRAINEE_USERNAME);
 
         assertNotNull(result);
         assertEquals(TRAINEE_USERNAME, result.getUser().getUsername());
     }
 
     @Test
-    void getTraineeByUsername_shouldThrow_whenNotAuthenticated() {
-        when(traineeService.authenticate(TRAINEE_USERNAME, "wrong")).thenReturn(false);
+    void getTraineeByUsername_shouldThrow_whenNotFound() {
+        when(traineeService.getTraineeByUsername("unknown")).thenReturn(Optional.empty());
 
-        assertThrows(SecurityException.class,
-                () -> gymFacade.getTraineeByUsername(TRAINEE_USERNAME, "wrong"));
+        assertThrows(IllegalArgumentException.class,
+                () -> gymFacade.getTraineeByUsername("unknown"));
     }
 
     @Test
-    void getTrainerByUsername_shouldReturnTrainer_whenAuthenticated() {
-        when(trainerService.authenticate(TRAINER_USERNAME, PASSWORD)).thenReturn(true);
+    void getTrainerByUsername_shouldReturnTrainer() {
         when(trainerService.getTrainerByUsername(TRAINER_USERNAME))
                 .thenReturn(Optional.of(trainer));
 
-        Trainer result = gymFacade.getTrainerByUsername(TRAINER_USERNAME, PASSWORD);
+        Trainer result = gymFacade.getTrainerByUsername(TRAINER_USERNAME);
 
         assertNotNull(result);
     }
 
     @Test
-    void getTrainerByUsername_shouldThrow_whenNotAuthenticated() {
-        when(trainerService.authenticate(TRAINER_USERNAME, "wrong")).thenReturn(false);
-
-        assertThrows(SecurityException.class,
-                () -> gymFacade.getTrainerByUsername(TRAINER_USERNAME, "wrong"));
-    }
-
-    @Test
-    void changeTraineePassword_shouldSucceed_whenAuthenticated() {
+    void changePassword_shouldSucceed_whenTraineeOldPasswordValid() {
         when(traineeService.authenticate(TRAINEE_USERNAME, PASSWORD)).thenReturn(true);
 
-        gymFacade.changeTraineePassword(TRAINEE_USERNAME, PASSWORD, "newPass1234");
+        gymFacade.changePassword(TRAINEE_USERNAME, PASSWORD, "newPass1234");
 
         verify(traineeService).changePassword(TRAINEE_USERNAME, "newPass1234");
     }
 
     @Test
-    void changeTraineePassword_shouldThrow_whenNotAuthenticated() {
-        when(traineeService.authenticate(TRAINEE_USERNAME, "wrong")).thenReturn(false);
-
-        assertThrows(SecurityException.class,
-                () -> gymFacade.changeTraineePassword(TRAINEE_USERNAME, "wrong", "newPass"));
-    }
-
-    @Test
-    void changeTrainerPassword_shouldSucceed_whenAuthenticated() {
+    void changePassword_shouldSucceed_whenTrainerOldPasswordValid() {
+        when(traineeService.authenticate(TRAINER_USERNAME, PASSWORD)).thenReturn(false);
         when(trainerService.authenticate(TRAINER_USERNAME, PASSWORD)).thenReturn(true);
 
-        gymFacade.changeTrainerPassword(TRAINER_USERNAME, PASSWORD, "newPass1234");
+        gymFacade.changePassword(TRAINER_USERNAME, PASSWORD, "newPass1234");
 
         verify(trainerService).changePassword(TRAINER_USERNAME, "newPass1234");
     }
 
     @Test
-    void updateTrainee_shouldSucceed_whenAuthenticated() {
-        when(traineeService.authenticate(TRAINEE_USERNAME, PASSWORD)).thenReturn(true);
+    void changePassword_shouldThrow_whenOldPasswordInvalid() {
+        when(traineeService.authenticate(TRAINEE_USERNAME, "wrong")).thenReturn(false);
+        when(trainerService.authenticate(TRAINEE_USERNAME, "wrong")).thenReturn(false);
+
+        assertThrows(SecurityException.class,
+                () -> gymFacade.changePassword(TRAINEE_USERNAME, "wrong", "newPass"));
+    }
+
+    @Test
+    void updateTrainee_shouldDelegateToService() {
         when(traineeService.updateTrainee(TRAINEE_USERNAME, "Johnny", "Doe",
                 LocalDate.of(1995, 6, 15), "New Address", true)).thenReturn(trainee);
 
-        Trainee result = gymFacade.updateTrainee(TRAINEE_USERNAME, PASSWORD,
+        Trainee result = gymFacade.updateTrainee(TRAINEE_USERNAME,
                 "Johnny", "Doe", LocalDate.of(1995, 6, 15), "New Address", true);
 
         assertNotNull(result);
     }
 
     @Test
-    void updateTrainer_shouldSucceed_whenAuthenticated() {
-        when(trainerService.authenticate(TRAINER_USERNAME, PASSWORD)).thenReturn(true);
+    void updateTrainer_shouldDelegateToService() {
         when(trainerService.updateTrainer(TRAINER_USERNAME, "Michael", "Johnson",
                 "FITNESS", true)).thenReturn(trainer);
 
-        Trainer result = gymFacade.updateTrainer(TRAINER_USERNAME, PASSWORD,
+        Trainer result = gymFacade.updateTrainer(TRAINER_USERNAME,
                 "Michael", "Johnson", "FITNESS", true);
 
         assertNotNull(result);
     }
 
     @Test
-    void activateTrainee_shouldSucceed_whenAuthenticated() {
-        when(traineeService.authenticate(TRAINEE_USERNAME, PASSWORD)).thenReturn(true);
-
-        gymFacade.activateTrainee(TRAINEE_USERNAME, PASSWORD);
+    void activateTrainee_shouldDelegateToService() {
+        gymFacade.activateTrainee(TRAINEE_USERNAME);
 
         verify(traineeService).activateTrainee(TRAINEE_USERNAME);
     }
 
     @Test
-    void deactivateTrainee_shouldSucceed_whenAuthenticated() {
-        when(traineeService.authenticate(TRAINEE_USERNAME, PASSWORD)).thenReturn(true);
-
-        gymFacade.deactivateTrainee(TRAINEE_USERNAME, PASSWORD);
+    void deactivateTrainee_shouldDelegateToService() {
+        gymFacade.deactivateTrainee(TRAINEE_USERNAME);
 
         verify(traineeService).deactivateTrainee(TRAINEE_USERNAME);
     }
 
     @Test
-    void activateTrainer_shouldSucceed_whenAuthenticated() {
-        when(trainerService.authenticate(TRAINER_USERNAME, PASSWORD)).thenReturn(true);
-
-        gymFacade.activateTrainer(TRAINER_USERNAME, PASSWORD);
+    void activateTrainer_shouldDelegateToService() {
+        gymFacade.activateTrainer(TRAINER_USERNAME);
 
         verify(trainerService).activateTrainer(TRAINER_USERNAME);
     }
 
     @Test
-    void deactivateTrainer_shouldSucceed_whenAuthenticated() {
-        when(trainerService.authenticate(TRAINER_USERNAME, PASSWORD)).thenReturn(true);
-
-        gymFacade.deactivateTrainer(TRAINER_USERNAME, PASSWORD);
+    void deactivateTrainer_shouldDelegateToService() {
+        gymFacade.deactivateTrainer(TRAINER_USERNAME);
 
         verify(trainerService).deactivateTrainer(TRAINER_USERNAME);
     }
 
     @Test
-    void deleteTraineeByUsername_shouldSucceed_whenAuthenticated() {
-        when(traineeService.authenticate(TRAINEE_USERNAME, PASSWORD)).thenReturn(true);
-
-        gymFacade.deleteTraineeByUsername(TRAINEE_USERNAME, PASSWORD);
+    void deleteTraineeByUsername_shouldDelegateToService() {
+        gymFacade.deleteTraineeByUsername(TRAINEE_USERNAME);
 
         verify(traineeService).deleteTraineeByUsername(TRAINEE_USERNAME);
     }
 
     @Test
-    void deleteTraineeByUsername_shouldThrow_whenNotAuthenticated() {
-        when(traineeService.authenticate(TRAINEE_USERNAME, "wrong")).thenReturn(false);
-
-        assertThrows(SecurityException.class,
-                () -> gymFacade.deleteTraineeByUsername(TRAINEE_USERNAME, "wrong"));
-    }
-
-    @Test
-    void getTraineeTrainings_shouldSucceed_whenAuthenticated() {
-        when(traineeService.authenticate(TRAINEE_USERNAME, PASSWORD)).thenReturn(true);
+    void getTraineeTrainings_shouldDelegateToService() {
         when(traineeService.getTraineeTrainings(TRAINEE_USERNAME, null, null, null, null))
                 .thenReturn(List.of(new Training()));
 
         List<Training> result = gymFacade.getTraineeTrainings(
-                TRAINEE_USERNAME, PASSWORD, null, null, null, null);
+                TRAINEE_USERNAME, null, null, null, null);
 
         assertEquals(1, result.size());
     }
 
     @Test
-    void getTrainerTrainings_shouldSucceed_whenAuthenticated() {
-        when(trainerService.authenticate(TRAINER_USERNAME, PASSWORD)).thenReturn(true);
+    void getTrainerTrainings_shouldDelegateToService() {
         when(trainerService.getTrainerTrainings(TRAINER_USERNAME, null, null, null))
                 .thenReturn(List.of(new Training()));
 
         List<Training> result = gymFacade.getTrainerTrainings(
-                TRAINER_USERNAME, PASSWORD, null, null, null);
+                TRAINER_USERNAME, null, null, null);
 
         assertEquals(1, result.size());
     }
 
     @Test
-    void addTraining_shouldSucceed_whenAuthenticated() {
+    void addTraining_shouldDelegateToService() {
         Training training = new Training(trainee, trainer, "Session",
                 fitnessType, LocalDate.of(2026, 5, 1), 60);
-        training.setId(1L);
 
-        when(traineeService.authenticate(TRAINEE_USERNAME, PASSWORD)).thenReturn(true);
+        when(trainerService.getTrainerByUsername(TRAINER_USERNAME))
+                .thenReturn(Optional.of(trainer));
         when(trainingService.addTraining(TRAINEE_USERNAME, TRAINER_USERNAME,
                 "Session", "FITNESS", LocalDate.of(2026, 5, 1), 60))
                 .thenReturn(training);
 
-        Training result = gymFacade.addTraining(TRAINEE_USERNAME, PASSWORD,
-                TRAINER_USERNAME, "Session", "FITNESS", LocalDate.of(2026, 5, 1), 60);
+        Training result = gymFacade.addTraining(TRAINEE_USERNAME,
+                TRAINER_USERNAME, "Session", LocalDate.of(2026, 5, 1), 60);
 
         assertNotNull(result);
     }
 
     @Test
-    void addTraining_shouldThrow_whenNotAuthenticated() {
-        when(traineeService.authenticate(TRAINEE_USERNAME, "wrong")).thenReturn(false);
+    void addTraining_shouldThrow_whenTrainerNotFound() {
+        when(trainerService.getTrainerByUsername("unknown")).thenReturn(Optional.empty());
 
-        assertThrows(SecurityException.class,
-                () -> gymFacade.addTraining(TRAINEE_USERNAME, "wrong", TRAINER_USERNAME,
-                        "Session", "FITNESS", LocalDate.of(2026, 5, 1), 60));
+        assertThrows(IllegalArgumentException.class,
+                () -> gymFacade.addTraining(TRAINEE_USERNAME, "unknown",
+                        "Session", LocalDate.of(2026, 5, 1), 60));
     }
 
     @Test
-    void getUnassignedTrainers_shouldSucceed_whenAuthenticated() {
-        when(traineeService.authenticate(TRAINEE_USERNAME, PASSWORD)).thenReturn(true);
+    void getUnassignedTrainers_shouldDelegateToService() {
         when(traineeService.getUnassignedTrainers(TRAINEE_USERNAME))
                 .thenReturn(List.of(trainer));
 
-        List<Trainer> result = gymFacade.getUnassignedTrainers(TRAINEE_USERNAME, PASSWORD);
+        List<Trainer> result = gymFacade.getUnassignedTrainers(TRAINEE_USERNAME);
 
         assertEquals(1, result.size());
     }
 
     @Test
-    void updateTraineeTrainers_shouldSucceed_whenAuthenticated() {
-        when(traineeService.authenticate(TRAINEE_USERNAME, PASSWORD)).thenReturn(true);
-
-        gymFacade.updateTraineeTrainers(TRAINEE_USERNAME, PASSWORD,
-                List.of(TRAINER_USERNAME));
+    void updateTraineeTrainers_shouldDelegateToService() {
+        gymFacade.updateTraineeTrainers(TRAINEE_USERNAME, List.of(TRAINER_USERNAME));
 
         verify(traineeService).updateTraineeTrainers(TRAINEE_USERNAME,
                 List.of(TRAINER_USERNAME));
-    }
-
-    @Test
-    void updateTraineeTrainers_shouldThrow_whenNotAuthenticated() {
-        when(traineeService.authenticate(TRAINEE_USERNAME, "wrong")).thenReturn(false);
-
-        assertThrows(SecurityException.class,
-                () -> gymFacade.updateTraineeTrainers(TRAINEE_USERNAME, "wrong",
-                        List.of(TRAINER_USERNAME)));
     }
 }

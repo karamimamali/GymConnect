@@ -14,6 +14,7 @@ import com.gymconnect.util.UsernameGenerator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,6 +34,7 @@ public class TrainerService {
     private UsernameGenerator usernameGenerator;
     private PasswordGenerator passwordGenerator;
     private GymMetrics gymMetrics;
+    private PasswordEncoder passwordEncoder;
 
     @Transactional
     public Trainer createTrainer(String firstName, String lastName,
@@ -48,11 +50,12 @@ public class TrainerService {
 
         List<String> existingUsernames = userDao.findAllUsernames();
         String username = usernameGenerator.generateUsername(firstName, lastName, existingUsernames);
-        String password = passwordGenerator.generatePassword();
+        String rawPassword = passwordGenerator.generatePassword();
 
         User user = new User(firstName, lastName, true);
         user.setUsername(username);
-        user.setPassword(password);
+        user.setRawPassword(rawPassword);
+        user.setPassword(passwordEncoder.encode(rawPassword));
 
         Trainer trainer = new Trainer(user, specialization);
         Trainer saved = trainerDao.save(trainer);
@@ -66,7 +69,7 @@ public class TrainerService {
         logger.debug("Authenticating trainer with username: {}", username);
         Optional<Trainer> trainer = trainerDao.findByUsername(username);
         boolean authenticated = trainer.isPresent()
-                && trainer.get().getUser().getPassword().equals(password);
+                && passwordEncoder.matches(password, trainer.get().getUser().getPassword());
         if (authenticated) {
             gymMetrics.recordAuthenticationSuccess();
         } else {
@@ -88,7 +91,7 @@ public class TrainerService {
         validateRequired(newPassword, "New password");
         Trainer trainer = trainerDao.findByUsername(username)
                 .orElseThrow(() -> new IllegalArgumentException("Trainer not found: " + username));
-        trainer.getUser().setPassword(newPassword);
+        trainer.getUser().setPassword(passwordEncoder.encode(newPassword));
         trainerDao.update(trainer);
         logger.info("Password changed successfully for trainer: {}", username);
     }
@@ -189,5 +192,10 @@ public class TrainerService {
     @Autowired
     public void setGymMetrics(GymMetrics gymMetrics) {
         this.gymMetrics = gymMetrics;
+    }
+
+    @Autowired
+    public void setPasswordEncoder(PasswordEncoder passwordEncoder) {
+        this.passwordEncoder = passwordEncoder;
     }
 }

@@ -1,1 +1,5 @@
 rootProject.name = 'GymConnect'
+
+include 'eureka-server'
+include 'main-service'
+include 'workload-service'

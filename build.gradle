@@ -1,100 +1,17 @@
-plugins {
-    id 'java'
-    id 'jacoco'
-    id 'application'
-    id 'org.springframework.boot' version '3.3.5'
-    id 'io.spring.dependency-management' version '1.1.6'
-}
+// Root build file for the GymConnect monorepo.
+// Each microservice (eureka-server, main-service, workload-service) is a
+// self-contained Spring Boot application defined in its own build.gradle.
+// Settings common to every module live here to keep the modules DRY.
 
-group = 'com.gymconnect'
-version = '1.0-SNAPSHOT'
+subprojects {
+    group = 'com.gymconnect'
+    version = '1.0-SNAPSHOT'
 
-application {
-    mainClass = 'com.gymconnect.GymApplication'
-}
-
-java {
-    sourceCompatibility = JavaVersion.VERSION_21
-    targetCompatibility = JavaVersion.VERSION_21
-}
-
-repositories {
-    mavenCentral()
-    repositories.removeAll { repo ->
-        repo instanceof MavenArtifactRepository && repo.url.toString().contains("10.3.3.7")
-    }
-}
-
-dependencies {
-    // Spring Boot
-    implementation 'org.springframework.boot:spring-boot-starter-web'
-    implementation 'org.springframework.boot:spring-boot-starter-validation'
-    implementation 'org.springframework.boot:spring-boot-starter-actuator'
-    implementation 'org.springframework.boot:spring-boot-starter-security'
-    implementation 'io.micrometer:micrometer-registry-prometheus'
-
-    // JWT
-    implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
-    runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
-    runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'
-
-    // Spring ORM + Hibernate
-    implementation 'org.springframework:spring-orm:6.1.14'
-    implementation 'org.hibernate.orm:hibernate-core:6.4.4.Final'
-
-    // H2 Database
-    implementation 'com.h2database:h2:2.2.224'
-
-    // Swagger / OpenAPI
-    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.6.0'
-
-    // Test
-    testImplementation 'org.springframework.boot:spring-boot-starter-test'
-    testImplementation 'org.springframework.security:spring-security-test'
-    testImplementation 'org.junit.jupiter:junit-jupiter:5.11.3'
-    testImplementation 'org.mockito:mockito-core:5.14.2'
-    testImplementation 'org.mockito:mockito-junit-jupiter:5.14.2'
-}
-
-test {
-    useJUnitPlatform()
-    finalizedBy jacocoTestReport
-}
-
-jacocoTestReport {
-    dependsOn test
-    afterEvaluate {
-        classDirectories.setFrom(files(classDirectories.files.collect {
-            fileTree(dir: it, exclude: [
-                    'com/gymconnect/GymApplication.class',
-                    'com/gymconnect/config/**',
-                    'com/gymconnect/dto/**'
-            ])
-        }))
-    }
-    reports {
-        xml.required = true
-        html.required = true
-    }
-}
-
-jacocoTestCoverageVerification {
-    afterEvaluate {
-        classDirectories.setFrom(files(classDirectories.files.collect {
-            fileTree(dir: it, exclude: [
-                    'com/gymconnect/GymApplication.class',
-                    'com/gymconnect/config/**',
-                    'com/gymconnect/dto/**'
-            ])
-        }))
-    }
-    violationRules {
-        rule {
-            limit {
-                minimum = 0.80
-            }
+    repositories {
+        mavenCentral()
+        // Defensive: drop any inherited internal mirror that is unreachable here.
+        repositories.removeAll { repo ->
+            repo instanceof MavenArtifactRepository && repo.url.toString().contains("10.3.3.7")
         }
     }
 }
-
-check.dependsOn jacocoTestCoverageVerification

@@ -24,8 +24,8 @@ GymConnect/
 ## Tech Stack
 
 - Java 21, Spring Boot 3.3.5, Spring Cloud 2023.0.3
-- Spring Cloud Netflix Eureka (discovery), OpenFeign (declarative client),
-  Resilience4j (circuit breaker + time limiter)
+- Spring Cloud Netflix Eureka (discovery)
+- Spring JMS + ActiveMQ Classic (asynchronous inter-service messaging, JSON payloads)
 - Spring Security + JWT (jjwt) for service-to-service authorization
 - Hibernate ORM + H2 (main-service); thread-safe in-memory store (workload-service)
 - springdoc-openapi (Swagger UI), SLF4J + Logback (two-level logging with transaction id)
@@ -34,25 +34,50 @@ GymConnect/
 ## How it works
 
 Whenever a training is **added** (or a trainee — and therefore their trainings — is
-**deleted**), `main-service` publishes a workload event to `workload-service`:
+**deleted**), `main-service` publishes a workload event **asynchronously** to
+ActiveMQ instead of calling `workload-service` over REST:
 
 ```
-main-service ──(Feign + Eureka + circuit breaker)──▶ POST /api/workloads
-   Authorization: Bearer <service JWT>
-   X-Transaction-Id: <propagated id>
+main-service ──(Spring JmsTemplate, JSON TextMessage)──▶ [trainer.workload.queue]
+                                                              │
+                              @JmsListener (1-10 concurrent consumers, per profile)
+                                                              ▼
+                                                      workload-service
+                          invalid payload (missing required data)
+                                                              ▼
+                                              [trainer.workload.queue.dlq]
 ```
 
 `workload-service` accrues (ADD) or reverses (DELETE) the training duration in the
 trainer's `year → month → total` summary, which can be retrieved via
-`GET /api/workloads/{username}`.
+`GET /api/workloads/{username}` (JWT-protected REST, read-only).
 
-The reporting call is **best-effort**: a circuit breaker with a 4s time limiter
-guards it, so if `workload-service` is slow or down the training operation still
-succeeds and the failure is logged (graceful degradation).
+Key messaging decisions:
 
-### Workload contract
+- **Managed by Spring, not JMS primitives** — the producer uses `JmsTemplate`
+  and the consumer a `@JmsListener` container; no `Session`/`MessageProducer`
+  code anywhere.
+- **JSON serialization** — messages travel as `TextMessage` JSON via
+  `MappingJackson2MessageConverter`; a broker-neutral `_type=TrainerWorkloadMessage`
+  property maps to each service's own DTO, so the services share no classes.
+- **Error handling & dead letter queue** — the consumer validates every message.
+  Payloads missing required information are moved to
+  `trainer.workload.queue.dlq` (with a `rejectionReason` property) since
+  redelivery can never fix them; unexpected processing failures roll back the
+  transacted session so the broker redelivers and eventually dead-letters the
+  message. Unreadable (malformed) messages follow the same broker DLQ path.
+- **Horizontal scaling of consumers** — the listener container concurrency is
+  profile-driven (`app.jms.concurrency`): `1-2` local up to `5-10` in prod.
+- **Best-effort publishing** — a broker outage is logged and swallowed, so the
+  core training operation still succeeds (graceful degradation).
+- **Tracing** — the caller's `transactionId` travels as a JMS message property
+  and is restored into the consumer's MDC, so one id correlates the logs of both
+  services.
 
-`POST /api/workloads` (Richardson level 2, JWT-protected)
+### Workload message contract
+
+JSON body of a `TextMessage` on `trainer.workload.queue`
+(`_type=TrainerWorkloadMessage`, optional `transactionId` property):
 
 ```json
 {
@@ -85,13 +110,21 @@ succeeds and the failure is logged (graceful degradation).
 
 ## Run locally
 
-Start the services in this order (each in its own terminal):
+Start an ActiveMQ broker, then the services (each in its own terminal):
 
 ```bash
+docker run -d --name activemq -p 61616:61616 -p 8161:8161 apache/activemq-classic
 ./gradlew :eureka-server:bootRun       # http://localhost:8761
 ./gradlew :workload-service:bootRun    # http://localhost:8081
 ./gradlew :main-service:bootRun        # http://localhost:8080
 ```
+
+ActiveMQ web console: `http://localhost:8161` (admin/admin) — inspect
+`trainer.workload.queue` and `trainer.workload.queue.dlq` there.
+
+Profiles (`local` default; `-Dspring.profiles.active=dev|stg|prod`) select the
+broker URL (`ACTIVEMQ_URL`/`ACTIVEMQ_USER`/`ACTIVEMQ_PASSWORD` overridable via
+environment) and the consumer concurrency per environment.
 
 Swagger UI: `http://localhost:8080/swagger-ui.html` and
 `http://localhost:8081/swagger-ui.html`.
@@ -101,12 +134,15 @@ Swagger UI: `http://localhost:8080/swagger-ui.html` and
 
 ## Implemented requirements
 
-- ✅ Separate workload microservice with REST endpoint and the required ADD/DELETE contract
+- ✅ Separate workload microservice with the required ADD/DELETE contract
 - ✅ In-memory monthly summary model (trainer → years → months → duration)
-- ✅ Main service calls the workload service on training add **and** on trainee deletion
+- ✅ REST between microservices replaced with **asynchronous ActiveMQ messaging**
+  (on training add **and** on trainee deletion)
+- ✅ Dead letter queue for invalid messages (required information missing)
+- ✅ JMS integration managed by Spring (`JmsTemplate` / `@JmsListener`), JSON serialization
+- ✅ JMS configuration per environment via Spring profiles; consumer concurrency scaling
 - ✅ Eureka discovery module
-- ✅ Circuit-breaker pattern (Resilience4j) with fallback + timeout handling
-- ✅ Bearer-token (JWT) authorization for microservice integration
+- ✅ Bearer-token (JWT) authorization for the remaining REST surface
 - ✅ Two-level logging (transaction level with a propagated `transactionId` + operation level)
 - ✅ Swagger contract, REST naming best practices, no raw 500s leaked to clients
 - ✅ Unit tests ≥ 80 % line coverage per module

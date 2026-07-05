@@ -1,6 +1,6 @@
 package com.gymconnect.facade;
 
-import com.gymconnect.client.WorkloadGateway;
+import com.gymconnect.messaging.WorkloadEventPublisher;
 import com.gymconnect.dto.WorkloadActionType;
 import com.gymconnect.model.Trainee;
 import com.gymconnect.model.Trainer;
@@ -38,7 +38,7 @@ class GymFacadeTest {
     @Mock
     private TrainingService trainingService;
     @Mock
-    private WorkloadGateway workloadGateway;
+    private WorkloadEventPublisher workloadEventPublisher;
 
     private GymFacade gymFacade;
 
@@ -51,7 +51,7 @@ class GymFacadeTest {
 
     @BeforeEach
     void setUp() {
-        gymFacade = new GymFacade(traineeService, trainerService, trainingService, workloadGateway);
+        gymFacade = new GymFacade(traineeService, trainerService, trainingService, workloadEventPublisher);
 
         fitnessType = new TrainingType("FITNESS");
         fitnessType.setId(1L);
@@ -232,7 +232,7 @@ class GymFacadeTest {
         gymFacade.deleteTraineeByUsername(TRAINEE_USERNAME);
 
         verify(traineeService).deleteTraineeByUsername(TRAINEE_USERNAME);
-        verify(workloadGateway).notify(WorkloadActionType.DELETE, training);
+        verify(workloadEventPublisher).publish(WorkloadActionType.DELETE, training);
     }
 
     @Test
@@ -272,7 +272,7 @@ class GymFacadeTest {
                 TRAINER_USERNAME, "Session", LocalDate.of(2026, 5, 1), 60);
 
         assertNotNull(result);
-        verify(workloadGateway).notify(WorkloadActionType.ADD, training);
+        verify(workloadEventPublisher).publish(WorkloadActionType.ADD, training);
     }
 
     @Test

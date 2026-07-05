@@ -1,7 +1,7 @@
 package com.gymconnect.facade;
 
-import com.gymconnect.client.WorkloadGateway;
 import com.gymconnect.dto.WorkloadActionType;
+import com.gymconnect.messaging.WorkloadEventPublisher;
 import com.gymconnect.model.Trainee;
 import com.gymconnect.model.Trainer;
 import com.gymconnect.model.Training;
@@ -23,14 +23,14 @@ public class GymFacade {
     private final TraineeService traineeService;
     private final TrainerService trainerService;
     private final TrainingService trainingService;
-    private final WorkloadGateway workloadGateway;
+    private final WorkloadEventPublisher workloadEventPublisher;
 
     public GymFacade(TraineeService traineeService, TrainerService trainerService,
-                     TrainingService trainingService, WorkloadGateway workloadGateway) {
+                     TrainingService trainingService, WorkloadEventPublisher workloadEventPublisher) {
         this.traineeService = traineeService;
         this.trainerService = trainerService;
         this.trainingService = trainingService;
-        this.workloadGateway = workloadGateway;
+        this.workloadEventPublisher = workloadEventPublisher;
     }
 
     // 1. Create Trainee profile (public - no auth required)
@@ -138,7 +138,7 @@ public class GymFacade {
         List<Training> trainings = traineeService.getTraineeTrainings(
                 username, null, null, null, null);
         traineeService.deleteTraineeByUsername(username);
-        trainings.forEach(training -> workloadGateway.notify(WorkloadActionType.DELETE, training));
+        trainings.forEach(training -> workloadEventPublisher.publish(WorkloadActionType.DELETE, training));
     }
 
     // 15. Get Trainee Trainings List (JWT auth enforced by Spring Security)
@@ -168,7 +168,7 @@ public class GymFacade {
         String trainingTypeName = trainer.getSpecialization().getTrainingTypeName();
         Training training = trainingService.addTraining(traineeUsername, trainerUsername,
                 trainingName, trainingTypeName, trainingDate, trainingDuration);
-        workloadGateway.notify(WorkloadActionType.ADD, training);
+        workloadEventPublisher.publish(WorkloadActionType.ADD, training);
         return training;
     }
 

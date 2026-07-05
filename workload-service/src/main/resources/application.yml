@@ -4,6 +4,25 @@ server:
 spring:
   application:
     name: workload-service
+  profiles:
+    # Override via -Dspring.profiles.active=dev|stg|prod
+    active: local
+  # ActiveMQ connection — environment specific; profile sections below override
+  # the fallback. Credentials are only applied when both values are non-empty.
+  activemq:
+    broker-url: ${ACTIVEMQ_URL:tcp://localhost:61616}
+    user: ${ACTIVEMQ_USER:}
+    password: ${ACTIVEMQ_PASSWORD:}
+
+app:
+  jms:
+    # Queue carrying trainer workload ADD/DELETE events (JSON payload)
+    workload-queue: trainer.workload.queue
+    # Application dead letter queue for messages missing required information
+    workload-dlq: trainer.workload.queue.dlq
+    # Concurrent consumer range (min-max) for the workload listener container;
+    # raised per environment below to scale consumption horizontally
+    concurrency: 1-2
 
 # Service-to-service JWT — must use the SAME secret as the main service so the
 # tokens it issues can be verified here without a shared user store.
@@ -33,3 +52,55 @@ springdoc:
 logging:
   level:
     com.gymconnect.workload: DEBUG
+
+---
+# Shared development environment
+spring:
+  config:
+    activate:
+      on-profile: dev
+  activemq:
+    broker-url: ${ACTIVEMQ_URL:tcp://activemq-dev:61616}
+
+app:
+  jms:
+    concurrency: 2-5
+
+---
+# Staging
+spring:
+  config:
+    activate:
+      on-profile: stg
+  activemq:
+    broker-url: ${ACTIVEMQ_URL:tcp://activemq-stg:61616}
+
+app:
+  jms:
+    concurrency: 3-8
+
+logging:
+  level:
+    com.gymconnect.workload: INFO
+
+---
+# Production
+spring:
+  config:
+    activate:
+      on-profile: prod
+  activemq:
+    broker-url: ${ACTIVEMQ_URL:tcp://activemq-prod:61616}
+
+app:
+  jms:
+    concurrency: 5-10
+
+logging:
+  level:
+    com.gymconnect.workload: INFO
+
+management:
+  endpoint:
+    health:
+      show-details: never

@@ -40,6 +40,9 @@ dependencies {
     // Spring Cloud — register with Eureka so the main service can discover it
     implementation 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client'
 
+    // Messaging — consumes workload events from the main service over ActiveMQ
+    implementation 'org.springframework.boot:spring-boot-starter-activemq'
+
     // JWT (shared secret with main-service for service-to-service auth)
     implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
     runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'

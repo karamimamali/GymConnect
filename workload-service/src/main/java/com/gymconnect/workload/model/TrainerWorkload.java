@@ -1,28 +1,45 @@
 package com.gymconnect.workload.model;
 
-import java.util.Map;
-import java.util.TreeMap;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
+import org.springframework.data.mongodb.core.mapping.Document;
+
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Optional;
 
 /**
- * In-memory aggregate holding a single trainer's accumulated training duration,
- * bucketed by year and then by month.
+ * MongoDB document holding a single trainer's training summary: identity fields plus
+ * the accrued training duration bucketed by year and then by month.
  *
- * <p>The nested {@link TreeMap}s keep years and months naturally ordered, which
- * makes building an ordered response trivial. All mutating operations are
- * synchronized on the instance so concurrent ADD/DELETE events for the same
- * trainer stay consistent.</p>
+ * <p>The {@code username} is the natural key and is stored as the document {@code _id}
+ * (a unique index for free). A compound index on {@code firstName + lastName} supports
+ * searching trainers by name. Years and months are kept ordered so summaries read
+ * naturally. Behaviour ({@link #addDuration}/{@link #subtractDuration}) lives on the
+ * document itself, keeping the service thin.</p>
  */
+@Document(collection = "trainer_workloads")
+@CompoundIndex(name = "trainer_name_idx", def = "{'firstName': 1, 'lastName': 1}")
 public class TrainerWorkload {
 
-    private final String username;
+    @Id
+    private String username;
+
     private String firstName;
+
     private String lastName;
-    private boolean active;
 
-    /** year -> (month -> total duration in minutes). */
-    private final Map<Integer, Map<Integer, Integer>> durationByYearAndMonth = new TreeMap<>();
+    /** Whether the trainer is currently active. Boolean per the schema requirement. */
+    private Boolean active;
 
-    public TrainerWorkload(String username, String firstName, String lastName, boolean active) {
+    private List<YearSummary> years = new ArrayList<>();
+
+    /** Required by Spring Data for document instantiation. */
+    public TrainerWorkload() {
+    }
+
+    public TrainerWorkload(String username, String firstName, String lastName, Boolean active) {
         this.username = username;
         this.firstName = firstName;
         this.lastName = lastName;
@@ -30,48 +47,40 @@ public class TrainerWorkload {
     }
 
     /** Refreshes the mutable identity fields from the latest event. */
-    public synchronized void updateIdentity(String firstName, String lastName, boolean active) {
+    public void updateIdentity(String firstName, String lastName, Boolean active) {
         this.firstName = firstName;
         this.lastName = lastName;
         this.active = active;
     }
 
-    /** Accrues {@code minutes} to the given year/month bucket. */
-    public synchronized void addDuration(int year, int month, int minutes) {
-        Map<Integer, Integer> months = durationByYearAndMonth.computeIfAbsent(year, y -> new TreeMap<>());
-        months.merge(month, minutes, Integer::sum);
+    /** Accrues {@code minutes} to the given year/month, creating records as needed. */
+    public void addDuration(int year, int month, long minutes) {
+        YearSummary yearSummary = findYear(year).orElseGet(() -> {
+            YearSummary created = new YearSummary(year);
+            years.add(created);
+            years.sort(Comparator.comparingInt(YearSummary::getYear));
+            return created;
+        });
+        yearSummary.addDuration(month, minutes);
     }
 
     /**
-     * Reverses {@code minutes} from the given year/month bucket. The total is
-     * floored at zero, and empty month/year buckets are pruned so a trainer whose
-     * trainings are all removed leaves no stale data behind.
+     * Reverses {@code minutes} from the given year/month. Empty month and year
+     * buckets are pruned so a trainer whose trainings are all removed leaves no
+     * stale data behind.
      */
-    public synchronized void subtractDuration(int year, int month, int minutes) {
-        Map<Integer, Integer> months = durationByYearAndMonth.get(year);
-        if (months == null) {
-            return;
-        }
-        Integer current = months.get(month);
-        if (current == null) {
-            return;
-        }
-        int remaining = current - minutes;
-        if (remaining > 0) {
-            months.put(month, remaining);
-        } else {
-            months.remove(month);
-        }
-        if (months.isEmpty()) {
-            durationByYearAndMonth.remove(year);
-        }
+    public void subtractDuration(int year, int month, long minutes) {
+        findYear(year).ifPresent(yearSummary -> {
+            yearSummary.subtractDuration(month, minutes);
+            if (yearSummary.isEmpty()) {
+                years.remove(yearSummary);
+            }
+        });
     }
 
-    /** @return an ordered, read-only snapshot of the year/month totals. */
-    public synchronized Map<Integer, Map<Integer, Integer>> snapshot() {
-        Map<Integer, Map<Integer, Integer>> copy = new TreeMap<>();
-        durationByYearAndMonth.forEach((year, months) -> copy.put(year, new TreeMap<>(months)));
-        return copy;
+    /** @return the year record for {@code year}, if one exists. */
+    public Optional<YearSummary> findYear(int year) {
+        return years.stream().filter(y -> y.getYear() == year).findFirst();
     }
 
     public String getUsername() {
@@ -86,7 +95,11 @@ public class TrainerWorkload {
         return lastName;
     }
 
-    public boolean isActive() {
+    public Boolean getActive() {
         return active;
+    }
+
+    public List<YearSummary> getYears() {
+        return years;
     }
 }

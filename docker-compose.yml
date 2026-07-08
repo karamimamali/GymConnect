@@ -1,0 +1,25 @@
+# Local infrastructure for the workload-service.
+#
+# Brings up the MongoDB instance that stores trainer training summaries so the
+# service builds and runs error-free out of the box:
+#
+#     docker compose up -d mongodb
+#
+# The default connection string (mongodb://localhost:27017/workload) matches the
+# `spring.data.mongodb.uri` fallback in workload-service/src/main/resources/application.yml.
+services:
+  mongodb:
+    image: mongo:7
+    container_name: gymconnect-mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  mongodb-data:

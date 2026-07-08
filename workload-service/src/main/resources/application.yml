@@ -13,6 +13,12 @@ spring:
     broker-url: ${ACTIVEMQ_URL:tcp://localhost:61616}
     user: ${ACTIVEMQ_USER:}
     password: ${ACTIVEMQ_PASSWORD:}
+  # MongoDB — stores trainer training summaries. auto-index-creation must be on so
+  # the @Id (username) and @CompoundIndex (firstName+lastName) indexes are created.
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://localhost:27017/workload}
+      auto-index-creation: true
 
 app:
   jms:
@@ -61,6 +67,10 @@ spring:
       on-profile: dev
   activemq:
     broker-url: ${ACTIVEMQ_URL:tcp://activemq-dev:61616}
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://mongodb-dev:27017/workload}
+      auto-index-creation: true
 
 app:
   jms:
@@ -74,6 +84,10 @@ spring:
       on-profile: stg
   activemq:
     broker-url: ${ACTIVEMQ_URL:tcp://activemq-stg:61616}
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://mongodb-stg:27017/workload}
+      auto-index-creation: true
 
 app:
   jms:
@@ -91,6 +105,10 @@ spring:
       on-profile: prod
   activemq:
     broker-url: ${ACTIVEMQ_URL:tcp://activemq-prod:61616}
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://mongodb-prod:27017/workload}
+      auto-index-creation: true
 
 app:
   jms:

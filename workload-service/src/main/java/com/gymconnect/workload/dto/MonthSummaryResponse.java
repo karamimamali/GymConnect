@@ -8,6 +8,6 @@ package com.gymconnect.workload.dto;
  */
 public record MonthSummaryResponse(
         int month,
-        int trainingSummaryDuration
+        long trainingSummaryDuration
 ) {
 }

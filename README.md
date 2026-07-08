@@ -11,7 +11,7 @@ provides service discovery.
 |--------------------|------|--------------------------------------------------------------------------------|
 | `eureka-server`    | 8761 | Netflix Eureka service-discovery registry.                                     |
 | `main-service`     | 8080 | Gym CRM REST API (trainees, trainers, trainings) + Hibernate/H2 + JWT security.|
-| `workload-service` | 8081 | Calculates & serves trainers' monthly training hours from an in-memory store.  |
+| `workload-service` | 8081 | Calculates & serves trainers' monthly training summaries, persisted in MongoDB. |
 
 ```
 GymConnect/
@@ -27,7 +27,7 @@ GymConnect/
 - Spring Cloud Netflix Eureka (discovery)
 - Spring JMS + ActiveMQ Classic (asynchronous inter-service messaging, JSON payloads)
 - Spring Security + JWT (jjwt) for service-to-service authorization
-- Hibernate ORM + H2 (main-service); thread-safe in-memory store (workload-service)
+- Hibernate ORM + H2 (main-service); Spring Data MongoDB (workload-service)
 - springdoc-openapi (Swagger UI), SLF4J + Logback (two-level logging with transaction id)
 - JUnit 5 + Mockito, JaCoCo (≥ 80 % line coverage enforced per module)
 
@@ -110,9 +110,11 @@ JSON body of a `TextMessage` on `trainer.workload.queue`
 
 ## Run locally
 
-Start an ActiveMQ broker, then the services (each in its own terminal):
+Start MongoDB (for `workload-service`) and an ActiveMQ broker, then the services
+(each in its own terminal):
 
 ```bash
+docker compose up -d mongodb                 # MongoDB on localhost:27017 (workload-service)
 docker run -d --name activemq -p 61616:61616 -p 8161:8161 apache/activemq-classic
 ./gradlew :eureka-server:bootRun       # http://localhost:8761
 ./gradlew :workload-service:bootRun    # http://localhost:8081
@@ -121,6 +123,9 @@ docker run -d --name activemq -p 61616:61616 -p 8161:8161 apache/activemq-classi
 
 ActiveMQ web console: `http://localhost:8161` (admin/admin) — inspect
 `trainer.workload.queue` and `trainer.workload.queue.dlq` there.
+MongoDB connection is overridable via `MONGODB_URI` (default
+`mongodb://localhost:27017/workload`); the `trainer_workloads` collection and its
+`firstName + lastName` index are created automatically on startup.
 
 Profiles (`local` default; `-Dspring.profiles.active=dev|stg|prod`) select the
 broker URL (`ACTIVEMQ_URL`/`ACTIVEMQ_USER`/`ACTIVEMQ_PASSWORD` overridable via
@@ -135,7 +140,9 @@ Swagger UI: `http://localhost:8080/swagger-ui.html` and
 ## Implemented requirements
 
 - ✅ Separate workload microservice with the required ADD/DELETE contract
-- ✅ In-memory monthly summary model (trainer → years → months → duration)
+- ✅ MongoDB training-summary document (trainer → years → months → duration), keyed by
+  username with a compound `firstName + lastName` index
+- ✅ Spring Data MongoDB repository (search/update by username); embedded-Mongo tests
 - ✅ REST between microservices replaced with **asynchronous ActiveMQ messaging**
   (on training add **and** on trainee deletion)
 - ✅ Dead letter queue for invalid messages (required information missing)

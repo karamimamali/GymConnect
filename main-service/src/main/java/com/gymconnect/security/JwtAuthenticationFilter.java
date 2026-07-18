@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -45,7 +46,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             String username = jwtTokenProvider.extractUsername(token);
 
             if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+                UserDetails userDetails;
+                try {
+                    userDetails = userDetailsService.loadUserByUsername(username);
+                } catch (UsernameNotFoundException ex) {
+                    // Token is valid but the account no longer exists (e.g. deleted
+                    // profile) — treat the request as unauthenticated instead of failing.
+                    logger.warn("JWT for unknown user '{}' rejected", username);
+                    filterChain.doFilter(request, response);
+                    return;
+                }
 
                 if (!userDetails.isAccountNonLocked()) {
                     logger.warn("Blocked account attempted access: {}", username);

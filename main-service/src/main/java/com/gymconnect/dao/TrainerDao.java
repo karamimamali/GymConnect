@@ -27,6 +27,8 @@ public class TrainerDao {
         Trainer trainer = sessionFactory.getCurrentSession()
                 .createQuery(
                         "FROM Trainer t JOIN FETCH t.user JOIN FETCH t.specialization "
+                                + "LEFT JOIN FETCH t.trainees tr "
+                                + "LEFT JOIN FETCH tr.user "
                                 + "WHERE t.user.username = :username",
                         Trainer.class)
                 .setParameter("username", username)

@@ -3,7 +3,6 @@ package com.gymconnect.config;
 import org.hibernate.SessionFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
-import org.springframework.context.annotation.Configuration;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.orm.hibernate5.HibernateTransactionManager;
 import org.springframework.orm.hibernate5.LocalSessionFactoryBean;
@@ -13,7 +12,11 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
 import javax.sql.DataSource;
 import java.util.Properties;
 
-@Configuration
+// Deliberately NOT annotated with a @Component stereotype: this class lives in a
+// package scanned by the full application, and the Cucumber suite boots that full
+// context — a @Configuration here would clash with the production HibernateConfig.
+// The DAO tests import it explicitly via @ContextConfiguration, which processes
+// the @Bean methods and @ComponentScan below without a stereotype.
 @EnableTransactionManagement
 @ComponentScan("com.gymconnect.dao")
 public class TestHibernateConfig {

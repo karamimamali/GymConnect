@@ -108,6 +108,39 @@ JSON body of a `TextMessage` on `trainer.workload.queue`
 ./gradlew :main-service:jacocoTestReport   # build/reports/jacoco/test/html/index.html
 ```
 
+### BDD suites (Cucumber)
+
+Both microservices are covered by Cucumber component tests (full Spring context:
+real security filter chain, H2 / embedded MongoDB, in-VM ActiveMQ — no external
+infrastructure needed), plus integration features that pin down the
+inter-service contract (JMS message format, shared JWT secret) from both sides.
+Feature files live under `src/test/resources/features/{component,integration}`.
+
+```bash
+# Everything (unit + Cucumber) for one service
+./gradlew :main-service:test
+./gradlew :workload-service:test
+
+# Only the BDD suites
+./gradlew :main-service:test --tests '*CucumberTest'
+./gradlew :workload-service:test --tests '*CucumberTest'
+
+# Select a set of scenarios by tag
+# (@component, @integration, @auth, @trainee, @trainer, @training,
+#  @security, @messaging, @summary, @events, @contract)
+./gradlew :main-service:test --tests '*CucumberTest' -Dcucumber.filter.tags=@auth
+./gradlew :workload-service:test --tests '*CucumberTest' -Dcucumber.filter.tags=@events
+
+# Select a single scenario by name
+./gradlew :main-service:test --tests '*CucumberTest' "-Dcucumber.filter.name=Successful login returns a JWT token"
+
+# Unit tests for a single endpoint's controller
+./gradlew :main-service:test --tests '*TraineeControllerTest'
+```
+
+Readable HTML reports are written to
+`<module>/build/reports/cucumber/<module>.html`.
+
 ## Run locally
 
 Start MongoDB (for `workload-service`) and an ActiveMQ broker, then the services
@@ -153,3 +186,10 @@ Swagger UI: `http://localhost:8080/swagger-ui.html` and
 - ✅ Two-level logging (transaction level with a propagated `transactionId` + operation level)
 - ✅ Swagger contract, REST naming best practices, no raw 500s leaked to clients
 - ✅ Unit tests ≥ 80 % line coverage per module
+- ✅ Cucumber (BDD) component tests for both microservices — positive, negative and
+  edge scenarios, including NFRs (login, brute-force lockout, token invalidation,
+  permissions)
+- ✅ Cucumber integration tests for the inter-service contract: published JMS
+  message format on the main-service side, consumption of the exact wire format
+  plus shared-secret JWT verification on the workload-service side
+- ✅ Test sets selectable from the CLI by suite, tag or scenario name (see above)

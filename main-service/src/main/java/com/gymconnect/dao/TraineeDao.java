@@ -26,7 +26,11 @@ public class TraineeDao {
     public Optional<Trainee> findByUsername(String username) {
         Trainee trainee = sessionFactory.getCurrentSession()
                 .createQuery(
-                        "FROM Trainee t JOIN FETCH t.user WHERE t.user.username = :username",
+                        "FROM Trainee t JOIN FETCH t.user "
+                                + "LEFT JOIN FETCH t.trainers tr "
+                                + "LEFT JOIN FETCH tr.user "
+                                + "LEFT JOIN FETCH tr.specialization "
+                                + "WHERE t.user.username = :username",
                         Trainee.class)
                 .setParameter("username", username)
                 .uniqueResultOptional()

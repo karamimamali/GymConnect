@@ -11,6 +11,7 @@ version = '1.0-SNAPSHOT'
 
 ext {
     springCloudVersion = '2023.0.3'
+    cucumberVersion = '7.18.1'
 }
 
 application {
@@ -70,10 +71,26 @@ dependencies {
     testImplementation 'org.junit.jupiter:junit-jupiter:5.11.3'
     testImplementation 'org.mockito:mockito-core:5.14.2'
     testImplementation 'org.mockito:mockito-junit-jupiter:5.14.2'
+
+    // BDD component/integration tests (Cucumber over the JUnit Platform)
+    testImplementation "io.cucumber:cucumber-java:${cucumberVersion}"
+    testImplementation "io.cucumber:cucumber-spring:${cucumberVersion}"
+    testImplementation "io.cucumber:cucumber-junit-platform-engine:${cucumberVersion}"
+    testImplementation 'org.junit.platform:junit-platform-suite:1.11.3'
+    testImplementation 'org.awaitility:awaitility'
+    // In-VM ActiveMQ broker so JMS scenarios run without external infrastructure
+    testImplementation 'org.apache.activemq:activemq-broker'
 }
 
 test {
     useJUnitPlatform()
+    // Forward Cucumber scenario selection from the CLI, e.g.
+    //   ./gradlew :main-service:test --tests '*CucumberTest' -Dcucumber.filter.tags=@auth
+    ['cucumber.filter.tags', 'cucumber.filter.name'].each { key ->
+        if (System.getProperty(key)) {
+            systemProperty key, System.getProperty(key)
+        }
+    }
     finalizedBy jacocoTestReport
 }
 
